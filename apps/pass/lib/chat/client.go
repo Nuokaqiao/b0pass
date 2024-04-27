@@ -135,11 +135,9 @@ func ServeWs(hub *Hub, c *gin.Context) {
 	go client.readPump()
 
 	// 读取缓存中的信息发给新链接的用户
-	if client.hub.msgCache != nil {
-		value := client.hub.msgCache.Get()
-		if value != nil {
-			log.Println("发送缓存中的信息")
-			client.hub.broadcast <- value
-		}
+	value := client.hub.msgCache.Get()
+	if value != nil {
+		log.Println("发送缓存中的信息")
+		client.send <- value
 	}
 }
