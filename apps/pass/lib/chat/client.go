@@ -67,6 +67,7 @@ func (c *Client) readPump() {
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 		c.hub.broadcast <- message
+		c.hub.msgCache.Set(message)
 	}
 }
 
@@ -126,8 +127,19 @@ func ServeWs(hub *Hub, c *gin.Context) {
 	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
 	client.hub.register <- client
 
+	// todo 用户身份校验
+
 	// Allow collection of memory referenced by the caller by doing all work in
 	// new goroutines.
 	go client.writePump()
 	go client.readPump()
+
+	// 读取缓存中的信息发给新链接的用户
+	if client.hub.msgCache != nil {
+		value := client.hub.msgCache.Get()
+		if value != nil {
+			log.Println("发送缓存中的信息")
+			client.hub.broadcast <- value
+		}
+	}
 }

@@ -14,6 +14,8 @@ type Hub struct {
 
 	// Unregister requests from clients.
 	unregister chan *Client
+
+	msgCache *MsgCache
 }
 
 func NewHub() *Hub {
@@ -22,6 +24,7 @@ func NewHub() *Hub {
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
+		msgCache:   NewCache(100),
 	}
 }
 

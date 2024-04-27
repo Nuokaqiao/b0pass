@@ -1,4 +1,4 @@
-package tools
+package cache
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ type elem struct {
 	pre        *elem
 }
 
-type lrucache struct {
+type Lrucache struct {
 	maxSize   int
 	elemCount int
 	elemList  map[interface{}]*elem
@@ -24,10 +24,10 @@ type lrucache struct {
 	mu        sync.Mutex
 }
 
-// New create a new lrucache
+// New create a new Lrucache
 // size: max number of element
-func New(size int) (*lrucache, error) {
-	newCache := new(lrucache)
+func NewCache(size int) (*Lrucache, error) {
+	newCache := new(Lrucache)
 	newCache.maxSize = size
 	newCache.elemCount = 0
 	newCache.elemList = make(map[interface{}]*elem)
@@ -35,10 +35,11 @@ func New(size int) (*lrucache, error) {
 }
 
 // Set create or update an element using key
-//      key:    The identity of an element
-//      value:  new value of the element
-//      ttl:    expire time, unit: second
-func (c *lrucache) Set(key interface{}, value interface{}, ttl ...int) error {
+//
+//	key:    The identity of an element
+//	value:  new value of the element
+//	ttl:    expire time, unit: second
+func (c *Lrucache) Set(key interface{}, value interface{}, ttl ...int) error {
 
 	// Ensure ttl are correct
 	if len(ttl) > 1 {
@@ -90,7 +91,7 @@ func (c *lrucache) Set(key interface{}, value interface{}, ttl ...int) error {
 }
 
 // updateKeyPtr 更新对应key的指针，放到链表的第一个
-func (c *lrucache) mvKeyToFirst(key interface{}) {
+func (c *Lrucache) mvKeyToFirst(key interface{}) {
 	elem := c.elemList[key]
 	if elem.pre == nil {
 		// 当key是第一个元素时，不做动作
@@ -115,7 +116,7 @@ func (c *lrucache) mvKeyToFirst(key interface{}) {
 	}
 }
 
-func (c *lrucache) eliminationOldest() {
+func (c *Lrucache) eliminationOldest() {
 	if c.last == nil {
 		return
 	}
@@ -127,7 +128,7 @@ func (c *lrucache) eliminationOldest() {
 	delete(c.elemList, key)
 }
 
-func (c *lrucache) deleteByKey(key interface{}) {
+func (c *Lrucache) deleteByKey(key interface{}) {
 	if v, ok := c.elemList[key]; ok {
 		if v.pre == nil && v.next == nil {
 			// 当key是第一个元素时，清空元素列表，充值指针和元素计数
@@ -154,7 +155,7 @@ func (c *lrucache) deleteByKey(key interface{}) {
 }
 
 // 遍历链表，检查并删除已经过期的元素
-func (c *lrucache) checkExpired() int {
+func (c *Lrucache) checkExpired() int {
 	now := time.Now().Unix()
 	tmp := c.first
 	count := 0
@@ -169,11 +170,12 @@ func (c *lrucache) checkExpired() int {
 }
 
 // Get Get the value of a cached element by key. If key do not exist, this function will return nil and a error msg
-//      key:    The identity of an element
-//      return:
-//          value:  the cached value, nil if key do not exist
-//          err:    error info, nil if value is not nil
-func (c *lrucache) Get(key interface{}) (value interface{}, err error) {
+//
+//	key:    The identity of an element
+//	return:
+//	    value:  the cached value, nil if key do not exist
+//	    err:    error info, nil if value is not nil
+func (c *Lrucache) Get(key interface{}) (value interface{}, err error) {
 	if v, ok := c.elemList[key]; ok {
 		if v.expireTime != -1 && time.Now().Unix() > v.expireTime {
 			// 如果过期了
@@ -187,7 +189,7 @@ func (c *lrucache) Get(key interface{}) (value interface{}, err error) {
 }
 
 // Delete delete an element
-func (c *lrucache) Delete(key interface{}) error {
+func (c *Lrucache) Delete(key interface{}) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, ok := c.elemList[key]; !ok {
