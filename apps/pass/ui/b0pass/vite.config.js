@@ -22,6 +22,12 @@ export default defineConfig({
   build: {
     outDir: '../dist',  // 构建输出到 ui/dist 目录
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        upload: fileURLToPath(new URL('./upload.html', import.meta.url)),
+      },
+    },
   },
   server: {
     port: 5173,

@@ -16,7 +16,7 @@
         通过切片上传、断点续传与 WebRTC 的混合能力，保障镜像、日志、视频等内部文件能够稳定通过网络传输。
       </p>
       <div class="hero-actions">
-        <button class="primary-btn">上传文件</button>
+        <button class="primary-btn" @click="openUpload">上传文件</button>
         <button class="ghost-btn">登录系统</button>
       </div>
     </section>
@@ -60,6 +60,13 @@
     </section>
   </div>
 </template>
+
+<script setup>
+const openUpload = () => {
+  const uploadUrl = new URL('/index/upload.html', window.location.origin);
+  window.location.href = uploadUrl.href;
+};
+</script setup>
 
 <style scoped>
 .page-shell {

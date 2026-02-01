@@ -9,8 +9,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/logrusorgru/aurora"
@@ -60,6 +62,44 @@ func run() {
 
 // 注册静态路由
 func routeStatic(live bool) {
+	assetsPrefix := "/app/pass/assets/"
+	var appAssetsFS fs.FS
+	if !live {
+		appAssetsFS, _ = fs.Sub(uiFS, "ui/dist/assets")
+	}
+	engine.Gin.Use(func(c *gin.Context) {
+		if !strings.HasPrefix(c.Request.URL.Path, assetsPrefix) {
+			return
+		}
+		relPath := strings.TrimPrefix(c.Request.URL.Path, assetsPrefix)
+		cleanPath := path.Clean("/" + relPath)
+		if strings.Contains(cleanPath, "..") {
+			c.Status(http.StatusBadRequest)
+			c.Abort()
+			return
+		}
+		relativeFile := strings.TrimPrefix(cleanPath, "/")
+		if relativeFile == "" {
+			c.Status(http.StatusNotFound)
+			c.Abort()
+			return
+		}
+		fullPath := filepath.Join(uiPath, "assets", relativeFile)
+		if live {
+			http.ServeFile(c.Writer, c.Request, fullPath)
+			c.Abort()
+			return
+		}
+		if _, err := os.Stat(fullPath); err == nil {
+			http.ServeFile(c.Writer, c.Request, fullPath)
+			c.Abort()
+			return
+		}
+		fileServer := http.FileServer(http.FS(appAssetsFS))
+		c.Request.URL.Path = "/" + relativeFile
+		fileServer.ServeHTTP(c.Writer, c.Request)
+		c.Abort()
+	})
 	if !live && config.DevServer != "" {
 		dev := devproxy.Handler(config.DevServer, "/index")
 		for _, path := range []string{
