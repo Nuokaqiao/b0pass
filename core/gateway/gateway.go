@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"b0go/core/engine"
+	"b0go/core/tools/devproxy"
 	"bytes"
 	"embed"
 	"fmt"
@@ -99,6 +100,13 @@ func addAppStaticRoute(live bool) {
 		}
 		//app/appid
 		for name, config := range engine.App {
+			if devConf, ok := config.Config.(devServerProvider); ok && devConf.DevServerEnabled() {
+				mount := fmt.Sprintf("/app/%s", name)
+				handler := devproxy.Handler(devConf.DevServerURL(), mount)
+				engine.Gin.Any(mount, handler)
+				engine.Gin.Any(mount+"/*path", handler)
+				continue
+			}
 			engine.Gin.Static(fmt.Sprintf("/app/%s", name), config.UIDir)
 		}
 	} else {
@@ -109,9 +117,21 @@ func addAppStaticRoute(live bool) {
 		}
 		//app/appid
 		for name, config := range engine.App {
+			if devConf, ok := config.Config.(devServerProvider); ok && devConf.DevServerEnabled() {
+				mount := fmt.Sprintf("/app/%s", name)
+				handler := devproxy.Handler(devConf.DevServerURL(), mount)
+				engine.Gin.Any(mount, handler)
+				engine.Gin.Any(mount+"/*path", handler)
+				continue
+			}
 			engine.Gin.StaticFS(fmt.Sprintf("/app/%s", name), http.FS(config.UIFS))
 		}
 	}
+}
+
+type devServerProvider interface {
+	DevServerEnabled() bool
+	DevServerURL() string
 }
 
 // AppInfo 应用信息JSON结构

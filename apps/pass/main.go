@@ -3,6 +3,7 @@ package app
 import (
 	"b0go/apps/pass/lib/chat"
 	"b0go/core/engine"
+	"b0go/core/tools/devproxy"
 	"embed"
 	"io/fs"
 	"log"
@@ -17,8 +18,9 @@ import (
 
 // APP:AppConfig
 type AppConfig struct {
-	Live bool
-	Path string //文件根目录路径
+	Live      bool
+	Path      string //文件根目录路径
+	DevServer string // 本地开发时的 Vite server 地址
 }
 
 // APP:VAR
@@ -58,7 +60,22 @@ func run() {
 
 // 注册静态路由
 func routeStatic(live bool) {
-	if live {
+	if !live && config.DevServer != "" {
+		dev := devproxy.Handler(config.DevServer, "/index")
+		for _, path := range []string{
+			"/index",
+			"/index/*path",
+			"/@id",
+			"/@id/*path",
+			"/@vite/*path",
+			"/node_modules/*path",
+			"/src/*path",
+			"/@fs/*path",
+			"/favicon.ico",
+		} {
+			engine.Gin.Any(path, dev)
+		}
+	} else if live {
 		engine.Gin.Static("/index", uiPath)
 	} else {
 		uiDist, _ := fs.Sub(uiFS, "ui/dist")
@@ -71,6 +88,14 @@ func routeStatic(live bool) {
 	})
 	//files静态
 	engine.Gin.StaticFS("/files", http.Dir(config.Path))
+}
+
+func (conf *AppConfig) DevServerURL() string {
+	return conf.DevServer
+}
+
+func (conf *AppConfig) DevServerEnabled() bool {
+	return conf.DevServer != "" && !conf.Live
 }
 
 // 注册应用路由

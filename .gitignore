@@ -7,3 +7,11 @@ main/files/*
 zdoc/*.zip
 zdoc/*/b0pass
 zdoc/*/b0pass.exe
+
+# Local dev helpers / configs we don't check in
+/config.ini
+/core/tools/devproxy/
+
+# Legacy/dist builds produced by the pass UI
+/apps/pass/ui/dist/
+/apps/pass/ui/dist_old/

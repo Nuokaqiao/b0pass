@@ -155,3 +155,22 @@ cd main && go run ./main.go
 # 编译运行开发版本
 cd main && ./build.bat
 ```
+
+## 6. 开发模式无需重启前端
+
+为了避免每次修改 Vue 源码都要重新打包，可以配合 Vite 的 dev server 直接在 `go run` 中访问最新的前端代码：
+
+- 进入 `apps/pass/ui/b0pass` 执行 `npm install`（首次）。
+- 启动 Vite：`npm run dev -- --host 0.0.0.0 --port 5173`，它自带热更新。
+- 把 `config.ini`（或 `main/config.ini`）里的 `pass` 配置改成：
+
+  ```toml
+  [pass]
+  Live = false
+  DevServer = "http://localhost:5173"
+  Path = "files"
+  ```
+
+- 再运行 `go run main/main.go`，后端会把所有 `/app/pass/*` 请求代理到 Vite dev server，浏览器打开 `http://localhost:8888/app/pass/` 就能看到实时更新的页面；API、文件路由照常由 Go 提供。
+
+开发完成后把 `pass.Live` 改回 `true`（或 remove `DevServer`）并 `npm run build` 生成 `apps/pass/ui/dist`，Go 会继续从嵌入的静态资源读取前端。
