@@ -1,58 +1,24 @@
 # Module: engine
 
 Status: Confirmed  
-Freshness: Fresh  
-
 Last Verified: 2026-09-08  
-Verified Commit: de3640e9dd7cf65ba64d606ae6a8021807b4abe3  
+Verified Commit: 9000df3  
 
-Related Paths:
-- core/engine/**
+路径：`core/engine/**`
 
----
+## 职责
 
-## Purpose
+App 安装、读 config、共享 Gin、统一 JSON、`SetAuthPassword` / JWT / CORS / PathAuth。
 
-应用运行时框架：安装 App、加载配置、共享 Gin 实例、统一 JSON 响应与中间件。
+## 要点
 
----
+- `AppInstall` + `Run(config)` → `go App.Run()`
+- 路由：`/{appId}{url}`
+- 响应：`{ code, msg, data }`（0 / 400 / 401）
+- JWT：Password 空则 `EnsureAuth` 放行；否则校验 token
+- `PathAuthMiddleware`：给 `/files`、`/ws` 等前缀用
+- `database.go`：GORM 辅助，**业务未连库**
 
-## Key Concepts
+## 风险
 
-- `App map[string]*AppConfig`：已安装应用
-- App 类型常量：`APP_HOOK` / `APP_APP` 等
-- `AppInstall`：记录 Name/Config/UIFS/Run/Dir
-- `Router`：注册 `/ {appId}{url}` 并记入 App.Router 元数据
-- `Run(configFile)`：读配置、toml 解码到各 App.Config、`go App.Run()`
-
----
-
-## Response Convention
-
-```json
-{ "code": 0|400|401, "msg": "...", "data": ... }
-```
-
-`OK` / `ERR` / `JSON` / `PAGE` 辅助函数。
-
----
-
-## Middleware
-
-- Gzip + Recovery（引擎 init）
-- `CorsMiddleware`（pass run 时挂载）
-- `JWTMiddleware`（按路由选择性挂载）
-
----
-
-## Database helpers
-
-`database.go` 提供 GORM Model / Paginate / BuildWhere。  
-**当前无业务调用链连接到真实 DB。**
-
----
-
-## Risks for consumers
-
-- JWT secret 硬编码
-- CORS 允许任意 Origin
+JWT Secret 硬编码；CORS `*`。
