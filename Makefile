@@ -1,16 +1,13 @@
 # b0pass / StonePass — 编译与部署
 #
 # 用法:
-#   make          # 检查依赖后编译前后端（默认）
-#   make check    # 仅检查依赖，缺什么列出来
-#   make deps     # 安装前后端依赖（go mod / npm install）
-#   make build    # 检查通过后：前端 build + Go 编译
-#   make deploy   # 编译并产出到 dist/（二进制 + 示例配置）
-#   make clean    # 清理产物
+#   make          # 一条命令：检查工具 → 装依赖（缺则装）→ 编前端 → 编二进制
+#   make deploy   # 同上，并产出 dist/ 部署包
+#   make check    # 仅检查（不安装、不编译）
+#   make clean    # 清理 dist/
 #
 # 可选变量:
-#   OUT_DIR=dist BIN_NAME=b0pass
-#   GOOS=linux GOARCH=amd64   # 交叉编译时设置
+#   GOOS=linux GOARCH=amd64   # 交叉编译
 
 ROOT         := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 FRONTEND_DIR := $(ROOT)/apps/pass/ui/vue/stonePass
@@ -27,34 +24,32 @@ else
   BIN_FILE := $(OUT_DIR)/$(BIN_NAME)
 endif
 
-.PHONY: all check deps frontend backend build deploy clean help
+.PHONY: all check tools ensure-deps deps frontend backend build deploy clean help
 
 all: build
 
 help:
 	@echo "目标:"
-	@echo "  make check    检查 go/node/npm 与前后端依赖是否齐全"
-	@echo "  make deps     安装缺失的前后端依赖"
-	@echo "  make build    检查通过后编译前端并打 Go 包"
-	@echo "  make deploy   编译并输出到 dist/"
-	@echo "  make clean    清理 dist/"
+	@echo "  make / make build   一条命令完成：检查工具、安装依赖、编译前后端"
+	@echo "  make deploy         同上，并输出到 dist/（含示例配置）"
+	@echo "  make check          仅检查依赖是否齐全（不安装、不编译）"
+	@echo "  make clean          清理 dist/"
 	@echo ""
-	@echo "交叉编译示例: make deploy GOOS=linux GOARCH=amd64"
+	@echo "交叉编译: make deploy GOOS=linux GOARCH=amd64"
 
-# ---------- 依赖检查（汇总缺失项）----------
+# ---------- 仅检查（不自动安装）----------
 check:
-	@bash "$(ROOT)/scripts/check-deps.sh" "$(ROOT)" "$(FRONTEND_DIR)"
+	@bash "$(ROOT)/scripts/check-deps.sh" "$(ROOT)" "$(FRONTEND_DIR)" check
 
-# ---------- 安装依赖 ----------
-deps:
-	@echo "==> 安装后端 Go 依赖"
-	@command -v go >/dev/null 2>&1 || { echo "[缺] Go 工具链，无法安装后端依赖"; exit 1; }
-	cd "$(ROOT)" && go mod download && go mod tidy
-	@echo "==> 安装前端 npm 依赖"
-	@command -v npm >/dev/null 2>&1 || { echo "[缺] npm，无法安装前端依赖"; exit 1; }
-	@test -f "$(FRONTEND_DIR)/package.json" || { echo "[缺] $(FRONTEND_DIR)/package.json"; exit 1; }
-	cd "$(FRONTEND_DIR)" && npm install
-	@echo "依赖安装完成"
+# ---------- 工具链（缺则失败，无法自动装）----------
+tools:
+	@bash "$(ROOT)/scripts/check-deps.sh" "$(ROOT)" "$(FRONTEND_DIR)" tools
+
+# ---------- 项目依赖：缺则自动安装 ----------
+ensure-deps: tools
+	@bash "$(ROOT)/scripts/ensure-deps.sh" "$(ROOT)" "$(FRONTEND_DIR)"
+
+deps: ensure-deps
 
 # ---------- 编译 ----------
 frontend:
@@ -71,8 +66,8 @@ backend:
 		go build -trimpath -ldflags="-s -w" -o "$(BIN_FILE)" .
 	@echo "后端编译完成: $(BIN_FILE)"
 
-build: check frontend backend
-	@echo "编译全部完成: $(BIN_FILE)"
+build: ensure-deps frontend backend
+	@echo "全部完成: $(BIN_FILE)"
 
 # ---------- 部署产出 ----------
 deploy: build
@@ -108,4 +103,4 @@ deploy: build
 clean:
 	@rm -rf "$(OUT_DIR)"
 	@echo "已清理 $(OUT_DIR)"
-	@echo "提示: 前端静态资源在 apps/pass/ui/dist，如需重建请 make frontend"
+	@echo "提示: 前端静态资源在 apps/pass/ui/dist，如需重建请 make"

@@ -90,16 +90,16 @@ npm run build        # 产物到 apps/pass/ui/dist/（该目录不入库，需�
 
 ### 用 Make 编译 / 部署
 
+一条命令即可（缺依赖会自动安装）：
+
 ```bash
-make check     # 检查 go / node / npm 与前后端依赖，缺什么会列出来
-make deps      # 安装缺失依赖（go mod + npm install）
-make build     # 检查通过后：前端 build + Go 编译 → dist/b0pass
+make           # 检查工具 → 装依赖 → 编前端 → 输出 dist/b0pass
 make deploy    # 同上，并附带 config.ini.example、README.txt
 ```
 
-交叉编译示例：`make deploy GOOS=linux GOARCH=amd64`
+交叉编译：`make deploy GOOS=linux GOARCH=amd64`
 
-说明：`apps/pass/ui/dist/` 与根目录 `dist/` 均不提交；克隆后请先 `make deps && make build`（或手动 `npm install` + `npm run build`）再编译/运行。
+说明：`apps/pass/ui/dist/` 与根目录 `dist/` 均不提交；克隆后直接 `make` 即可。
 
 Windows 亦可参考 `main/build.bat` 做打包编译。
 

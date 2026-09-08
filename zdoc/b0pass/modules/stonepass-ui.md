@@ -4,7 +4,7 @@ Status: Confirmed
 Last Verified: 2026-09-08  
 Verified Commit: 9000df3  
 
-路径：`apps/pass/ui/vue/stonePass/` → build 到 `apps/pass/ui/dist/`（`base: '/app/pass/'`）。
+路径：`apps/pass/ui/vue/stonePass/` → `npm run build` 到 `apps/pass/ui/dist/`（`base: '/app/pass/'`）。**`ui/dist` 不入库**，克隆后需本地/CI 构建后再 `go build`（embed）。
 
 ## 路由
 
