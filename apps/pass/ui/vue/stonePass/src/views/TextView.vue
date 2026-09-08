@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getToken } from '@/api/auth'
 import { fetchTextHistory } from '@/api/pass'
+import { renderMarkdown } from '@/utils/markdown'
 
 const STORAGE_KEY = 'txtdata'
 const MAX_ITEMS = 100
@@ -97,6 +98,11 @@ async function scrollBottom() {
 
 function extractUrls(text) {
   return [...new Set((text.match(URL_RE) || []).map((u) => u.replace(/[),.;!?]+$/, '')))]
+}
+
+function onBodyClick(e, msg) {
+  if (e.target.closest('a')) return
+  copyText(msg)
 }
 
 function pushMessage(text, meta = {}) {
@@ -264,9 +270,12 @@ onBeforeUnmount(() => {
               <button class="link-btn danger" type="button" @click="removeAt(msg.key)">删除</button>
             </div>
 
-            <button class="card-body" type="button" :title="'点击复制'" @click="copyText(msg)">
-              <pre>{{ msg.val }}</pre>
-            </button>
+            <div
+              class="card-body md-body"
+              title="点击复制原文"
+              @click="onBodyClick($event, msg)"
+              v-html="renderMarkdown(msg.val)"
+            />
 
             <div class="card-actions">
               <button
@@ -274,7 +283,7 @@ onBeforeUnmount(() => {
                 type="button"
                 @click="copyText(msg)"
               >
-                {{ copiedKey === msg.key ? '已复制' : '复制' }}
+                {{ copiedKey === msg.key ? '已复制' : '复制原文' }}
               </button>
               <a
                 v-for="url in extractUrls(msg.val)"
@@ -295,12 +304,12 @@ onBeforeUnmount(() => {
         <textarea
           v-model="draft"
           rows="4"
-          placeholder="粘贴文字或链接，同步到其他设备…"
+          placeholder="支持简易 Markdown：**粗体** *斜体* `代码` [链接](url) 等&#10;Ctrl / ⌘ + Enter 同步"
           @keydown.meta.enter.prevent="sync"
           @keydown.ctrl.enter.prevent="sync"
         />
         <div class="composer-actions">
-          <span class="muted hint">Ctrl / ⌘ + Enter</span>
+          <span class="muted hint">Markdown · Ctrl / ⌘ + Enter</span>
           <button
             class="btn btn-primary"
             type="button"
@@ -417,13 +426,97 @@ onBeforeUnmount(() => {
   color: inherit;
 }
 
-.card-body pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
+.md-body {
   font-size: 0.98rem;
   line-height: 1.55;
+  word-break: break-word;
+}
+
+.md-body :deep(p) {
+  margin: 0 0 0.55em;
+}
+
+.md-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.md-body :deep(h1),
+.md-body :deep(h2),
+.md-body :deep(h3),
+.md-body :deep(h4) {
+  margin: 0.4em 0 0.35em;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.md-body :deep(h1) {
+  font-size: 1.2rem;
+}
+
+.md-body :deep(h2) {
+  font-size: 1.1rem;
+}
+
+.md-body :deep(h3),
+.md-body :deep(h4) {
+  font-size: 1.02rem;
+}
+
+.md-body :deep(ul),
+.md-body :deep(ol) {
+  margin: 0.35em 0;
+  padding-left: 1.35em;
+}
+
+.md-body :deep(li) {
+  margin: 0.15em 0;
+}
+
+.md-body :deep(blockquote) {
+  margin: 0.45em 0;
+  padding: 0.2em 0 0.2em 0.85em;
+  border-left: 3px solid rgba(15, 110, 140, 0.35);
+  color: var(--muted);
+}
+
+.md-body :deep(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0.12em 0.35em;
+  border-radius: 6px;
+  background: rgba(15, 110, 140, 0.1);
+}
+
+.md-body :deep(pre) {
+  margin: 0.45em 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+  background: rgba(26, 35, 50, 0.06);
+  border: 1px solid var(--line);
+}
+
+.md-body :deep(pre code) {
+  padding: 0;
+  background: transparent;
+}
+
+.md-body :deep(a) {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.md-body :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 0.7em 0;
+}
+
+.md-body :deep(strong) {
+  font-weight: 700;
 }
 
 .card-actions {

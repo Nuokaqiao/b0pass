@@ -1,6 +1,7 @@
 package app
 
 import (
+	"b0go/apps/pass/lib/audit"
 	"b0go/apps/pass/lib/chat"
 	"b0go/apps/pass/lib/files"
 	"b0go/apps/pass/lib/keys"
@@ -48,6 +49,7 @@ func Login(c *gin.Context) {
 		password = strings.TrimSpace(body.Password)
 	}
 	if !engine.CheckPassword(password) {
+		audit.Log(c, "login-fail", "")
 		engine.JSON(401, "口令错误", nil, c)
 		return
 	}
@@ -56,6 +58,7 @@ func Login(c *gin.Context) {
 		engine.ERR("签发失败", c)
 		return
 	}
+	audit.Log(c, "login-ok", "")
 	engine.OK("OK", gin.H{"token": token, "enabled": true, "expireHours": 24}, c)
 }
 
@@ -98,6 +101,7 @@ func CmdOpen(c *gin.Context) {
 	if ext == ".BAT" || ext == ".CMD" || ext == ".EXE" {
 		engine.ERR("该文件暂不支持打开", c)
 	} else {
+		audit.Log(c, "cmd-open", "path="+f)
 		cmd.Open(RootPath + f)
 	}
 }
@@ -105,6 +109,7 @@ func CmdOpen(c *gin.Context) {
 // CmdKey 主电脑键盘
 func CmdKey(c *gin.Context) {
 	k := c.Query("k")
+	audit.Log(c, "cmd-key", "k="+k)
 	keys.SendKey(k)
 	engine.OK("OK", nil, c)
 }
@@ -130,6 +135,7 @@ func NodeRename(c *gin.Context) {
 		engine.ERR(err.Error(), c)
 		return
 	}
+	audit.Log(c, "node-rename", "from="+f+" to="+n)
 	engine.OK("OK", nil, c)
 }
 
@@ -158,6 +164,7 @@ func NodeRemove(c *gin.Context) {
 		return
 	}
 	files.GetExpireStore(config.Path).DeleteMeta("/" + f)
+	audit.Log(c, "node-delete", "path=/"+f)
 	engine.OK("OK", nil, c)
 }
 
@@ -176,6 +183,7 @@ func NodeAdd(c *gin.Context) {
 	if err != nil {
 		engine.ERR(err.Error(), c)
 	}
+	audit.Log(c, "node-add", "path="+f)
 	engine.OK("OK", nil, c)
 }
 
@@ -249,7 +257,7 @@ func FileDownload(c *gin.Context) {
 	c.Header("Content-Transfer-Encoding", "binary")
 	c.Header("Cache-Control", "no-cache")
 
-	//fmt.Println(filePath)
+	audit.Log(c, "file-download", "path="+f)
 	c.File(filePath)
 }
 
@@ -260,6 +268,7 @@ func FileUpload(c *gin.Context) {
 		lens, _ = strconv.Atoi(vals[0])
 	}
 	log.Println("FileUpload::::", lens)
+	audit.Log(c, "file-upload-start", fmt.Sprintf("bytes=%d dir=%s", lens, c.DefaultQuery("f", "/")))
 	if lens > 4096 {
 		FileUploadBig(c)
 	} else {
@@ -287,6 +296,7 @@ func FileUploadTiny(c *gin.Context) {
 		return
 	}
 	applyUploadExpire(c, f, file.Filename)
+	audit.Log(c, "file-upload-ok", "file="+file.Filename+" dir="+f)
 	engine.OK("上传成功", "", c)
 }
 
@@ -355,6 +365,7 @@ func FileUploadBig(c *gin.Context) {
 		}
 	}
 	//上传成功
+	audit.Log(c, "file-upload-ok", "dir="+dirQuery+" mode=big")
 	engine.OK("上传成功", "", c)
 }
 
@@ -387,6 +398,7 @@ func FileExpire(c *gin.Context) {
 		engine.ERR("保存过期设置失败: "+err.Error(), c)
 		return
 	}
+	audit.Log(c, "file-expire", fmt.Sprintf("path=%s expire=%d", rel, expire))
 	engine.OK("OK", gin.H{"path": rel, "expire": expire}, c)
 }
 

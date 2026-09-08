@@ -23,7 +23,7 @@ Related Paths:
 | JWT | `POST /pass/login` 签发；Header/Query/Cookie `token`；pass API、`/files`、`/ws` 校验 | Confirmed |
 | Password 配置 | `[gateway] Password`；空=关闭鉴权 | Confirmed |
 | CORS | `Access-Control-Allow-Origin: *` | Confirmed |
-| README 规划的 Pread/Pupload/Padmin | 仍未按角色细分；当前为共享口令 | Confirmed（文档/现状） |
+| 操作审计日志 | 登录、上传/下载/删改、过期、WS 同步等打 `[audit]` 日志，含 IP / device / UA | Confirmed |
 
 **业务含义**：任何能访问端口的客户端可读写共享目录、可发送键鼠命令（若调用 API）、可加入 WS 广播。
 

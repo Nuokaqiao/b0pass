@@ -2,8 +2,12 @@ package chat
 
 import (
 	"bytes"
+	"fmt"
 	"log"
+	"strconv"
 	"time"
+
+	"b0go/apps/pass/lib/audit"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -42,6 +46,10 @@ type Client struct {
 
 	// Buffered channel of outbound messages.
 	send chan []byte
+
+	ip     string
+	ua     string
+	device string
 }
 
 // readPump pumps messages from the websocket connection to the hub.
@@ -51,6 +59,7 @@ type Client struct {
 // reads from this goroutine.
 func (c *Client) readPump() {
 	defer func() {
+		audit.LogFields("ws-leave", c.ip, c.device, c.ua, "")
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
@@ -66,15 +75,20 @@ func (c *Client) readPump() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		preview := string(message)
+		if len(preview) > 80 {
+			preview = preview[:77] + "..."
+		}
+		audit.LogFields("text-sync", c.ip, c.device, c.ua, fmt.Sprintf("bytes=%d preview=%s", len(message), strconv.Quote(preview)))
 		c.hub.broadcast <- message
 	}
 }
 
 // writePump pumps messages from the hub to the websocket connection.
 //
-// A goroutine running writePump is started for each connection. The
-// application ensures that there is at most one writer to a connection by
-// executing all writes from this goroutine.
+// A goroutine running writePump is started for each connection. The application
+// ensures that there is at most one writer to a connection by executing all
+// writes from this goroutine.
 func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -118,12 +132,20 @@ func (c *Client) writePump() {
 
 // serveWs handles websocket requests from the peer.
 func ServeWs(hub *Hub, c *gin.Context) {
+	info := audit.FromGin(c)
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
-	//defer conn.Close()
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
+	client := &Client{
+		hub:    hub,
+		conn:   conn,
+		send:   make(chan []byte, 256),
+		ip:     info.IP,
+		ua:     info.UA,
+		device: info.Device,
+	}
+	audit.LogFields("ws-join", client.ip, client.device, client.ua, "")
 	client.hub.register <- client
 
 	// Allow collection of memory referenced by the caller by doing all work in

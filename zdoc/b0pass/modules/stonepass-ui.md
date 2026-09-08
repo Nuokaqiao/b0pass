@@ -61,11 +61,12 @@ Confirmed（当前源码）：
 
 Confirmed（当前源码）：
 
-- 布局：最近内容在上，输入区在下
+- 布局：最近内容在上，输入区在下；消息时间正序（新在下）
 - 文案：同步 / 最近内容（非聊天语义）
-- 卡片：点击复制、复制反馈、URL「打开链接」
-- WebSocket 自动重连 + 状态胶囊
-- 本地 `localStorage.txtdata`，最多约 100 条
+- 简易 Markdown 渲染展示（`marked` + `DOMPurify`）；复制为原文
+- 卡片：点击复制原文、URL「打开链接」
+- WebSocket 自动重连 + 状态胶囊；进入时拉服务端历史
+- 本地 `localStorage.txtdata` 作缓存兜底
 
 ---
 
