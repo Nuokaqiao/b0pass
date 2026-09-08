@@ -28,3 +28,9 @@ npm run build
 - `/` 首页：大按钮「传文件」「传内容」
 - `/files` 传文件
 - `/text` 传内容（WebSocket）
+
+## 注意
+
+`[pass] Live = false` 时前端由 Go **embed** 打包进进程：改完 `npm run build` 后必须 **重启** `go run`，否则浏览器仍是旧 JS。
+
+开发建议 `Live = true`（Vite 未启动时会直接读 `ui/dist` 磁盘文件）。

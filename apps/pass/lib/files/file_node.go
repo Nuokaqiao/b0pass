@@ -37,7 +37,7 @@ func NodeTree(rootpath, f string) FileNode {
 func NodeAdd(fPath string) error {
 	dir, file := filepath.Split(fPath)
 	log.Println("::NodeAdd-> dir=", dir, "file=", file)
-	if err := os.MkdirAll(dir, 0666); err != nil {
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 	if file != "" {

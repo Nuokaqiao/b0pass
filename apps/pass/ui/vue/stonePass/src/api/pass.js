@@ -12,24 +12,29 @@ async function request(url, options = {}) {
 
 export function fetchFileList(path = '/') {
   const f = path || '/'
-  return request(`/pass/file-list?f=${encodeURIComponent(f)}`)
+  // 防浏览器缓存导致删除/上传后列表不更新
+  return request(`/pass/file-list?f=${encodeURIComponent(f)}&_t=${Date.now()}`)
 }
 
 export function deleteNode(path) {
-  return request(`/pass/node-delete?f=${encodeURIComponent(path)}`)
+  return request(`/pass/node-delete?f=${encodeURIComponent(path)}&_t=${Date.now()}`)
 }
 
 export function addNode(path) {
   return request(`/pass/node-add?f=${encodeURIComponent(path)}`)
 }
 
-export function uploadFile(dirPath, file, onProgress) {
+export function uploadFile(dirPath, file, onProgress, expireUnix = 0) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     const form = new FormData()
     form.append('file', file)
     const target = dirPath || '/'
-    xhr.open('POST', `/pass/file-upload?f=${encodeURIComponent(target)}`)
+    let url = `/pass/file-upload?f=${encodeURIComponent(target)}`
+    if (expireUnix > 0) {
+      url += `&expire=${expireUnix}`
+    }
+    xhr.open('POST', url)
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {
         onProgress(Math.round((e.loaded / e.total) * 100))
@@ -50,6 +55,12 @@ export function uploadFile(dirPath, file, onProgress) {
     xhr.onerror = () => reject(new Error('上传失败'))
     xhr.send(form)
   })
+}
+
+export function setFileExpire(path, expireUnix = 0) {
+  return request(
+    `/pass/file-expire?f=${encodeURIComponent(path)}&expire=${expireUnix || 0}&_t=${Date.now()}`,
+  )
 }
 
 export function downloadUrl(path) {

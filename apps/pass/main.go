@@ -2,6 +2,7 @@ package app
 
 import (
 	"b0go/apps/pass/lib/chat"
+	"b0go/apps/pass/lib/files"
 	"b0go/core/engine"
 	"embed"
 	"io/fs"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/logrusorgru/aurora"
@@ -57,6 +59,8 @@ func run() {
 	routeApi()
 	routeWs()
 	putDll()
+	// 默认不过期；有设置过期的文件由后台定期清理
+	files.StartExpireCleaner(config.Path, time.Minute)
 }
 
 // 注册静态路由
@@ -139,8 +143,9 @@ func routeApi() {
 	engine.GET(appId, "/file-list", "{f=相对路径,[t=需要的类型]}", "文件列表", FileList)
 	engine.GET(appId, "/file-content", "{f=相对路径,文件名称}", "文件内容", FileContent)
 	engine.GET(appId, "/file-download", "{f=相对路径}", "文件列表", FileDownload)
+	engine.GET(appId, "/file-expire", "{f=相对路径,expire=unix秒(0不过期)}", "设置文件过期时间", FileExpire)
 
-	engine.POST(appId, "/file-upload", "{post file}", "大文件上传", FileUpload)
+	engine.POST(appId, "/file-upload", "{post file,[expire=unix秒]}", "大文件上传", FileUpload)
 }
 
 /***** HttpRequest *****/

@@ -11,8 +11,10 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -86,11 +88,23 @@ func NodeRemove(c *gin.Context) {
 		engine.ERR("路径不能为空", c)
 		return
 	}
-	err := files.NodeRemove(RootPath + f)
+	// 统一成相对路径，避免出现 "files"+"/x" 之外的意外拼接
+	f = strings.ReplaceAll(f, "\\", "/")
+	for strings.HasPrefix(f, "/") {
+		f = strings.TrimPrefix(f, "/")
+	}
+	if f == "" || strings.Contains(f, "..") {
+		engine.ERR("非法路径", c)
+		return
+	}
+	filePath := filepath.Join(RootPath, f)
+	log.Println("::NodeRemove::", filePath)
+	err := files.NodeRemove(filePath)
 	if err != nil {
 		engine.ERR(err.Error(), c)
 		return
 	}
+	files.GetExpireStore(config.Path).DeleteMeta("/" + f)
 	engine.OK("OK", nil, c)
 }
 
@@ -123,7 +137,27 @@ func FileList(c *gin.Context) {
 	RootPath := config.Path
 	f := c.Query("f")
 	t := c.DefaultQuery("t", "")
+	// 列表前顺手清理一次过期文件
+	files.GetExpireStore(RootPath).PurgeExpired()
 	listMap := files.GetDirTree(RootPath, RootPath+f, "", t)
+	store := files.GetExpireStore(RootPath)
+	now := time.Now().Unix()
+	for _, m := range listMap {
+		p, _ := m["path"].(string)
+		exp := store.Get(p)
+		m["expire"] = exp
+		if exp > 0 {
+			m["expireAt"] = time.Unix(exp, 0).Format("01-02 15:04")
+			left := exp - now
+			if left < 0 {
+				left = 0
+			}
+			m["expireLeft"] = left
+		} else {
+			m["expireAt"] = ""
+			m["expireLeft"] = int64(0)
+		}
+	}
 	engine.OK("OK", listMap, c)
 }
 
@@ -168,7 +202,10 @@ func FileDownload(c *gin.Context) {
 
 // FileUpload 上传文件
 func FileUpload(c *gin.Context) {
-	lens, _ := strconv.Atoi(c.Request.Header["Content-Length"][0])
+	lens := 0
+	if vals := c.Request.Header["Content-Length"]; len(vals) > 0 {
+		lens, _ = strconv.Atoi(vals[0])
+	}
 	log.Println("FileUpload::::", lens)
 	if lens > 4096 {
 		FileUploadBig(c)
@@ -182,12 +219,21 @@ func FileUploadTiny(c *gin.Context) {
 	RootPath := config.Path
 	f := c.DefaultQuery("f", "/")
 	RootPath = RootPath + f
-	files.NodeAdd(RootPath)
-	log.Println("FileUploadBig:::", RootPath)
-	//上传文件
-	file, _ := c.FormFile("file")
-	c.SaveUploadedFile(file, RootPath+file.Filename)
-	//上传成功
+	if err := files.NodeAdd(RootPath); err != nil {
+		engine.ERR("创建目录失败: "+err.Error(), c)
+		return
+	}
+	log.Println("FileUploadTiny:::", RootPath)
+	file, err := c.FormFile("file")
+	if err != nil {
+		engine.ERR("请先选择文件: "+err.Error(), c)
+		return
+	}
+	if err := c.SaveUploadedFile(file, RootPath+file.Filename); err != nil {
+		engine.ERR("保存文件失败: "+err.Error(), c)
+		return
+	}
+	applyUploadExpire(c, f, file.Filename)
 	engine.OK("上传成功", "", c)
 }
 
@@ -195,9 +241,12 @@ func FileUploadTiny(c *gin.Context) {
 func FileUploadBig(c *gin.Context) {
 
 	RootPath := config.Path
-	f := c.DefaultQuery("f", "/")
-	RootPath = RootPath + f
-	files.NodeAdd(RootPath)
+	dirQuery := c.DefaultQuery("f", "/")
+	RootPath = RootPath + dirQuery
+	if err := files.NodeAdd(RootPath); err != nil {
+		engine.ERR("创建目录失败: "+err.Error(), c)
+		return
+	}
 	log.Println("FileUploadBig:::", RootPath)
 
 	content_type_, has_key := c.Request.Header["Content-Type"]
@@ -228,21 +277,22 @@ func FileUploadBig(c *gin.Context) {
 		}
 		//创建保存文件
 		log.Printf("save file: [%s]\n", RootPath+file_header.FileName)
-		f, err := os.Create(RootPath + file_header.FileName)
+		out, err := os.Create(RootPath + file_header.FileName)
 		if err != nil {
 			engine.ERR("create file fail: "+err.Error(), c)
 			return
 		}
-		f.Write(file_data)
+		out.Write(file_data)
 		file_data = nil
 
 		//搜索boundary
-		temp_data, reach_end, err := stream.ReadToBoundary(boundary, c.Request.Body, f)
-		f.Close()
+		temp_data, reach_end, err := stream.ReadToBoundary(boundary, c.Request.Body, out)
+		out.Close()
 		if err != nil {
 			engine.ERR("search boundary fail: "+err.Error(), c)
 			return
 		}
+		applyUploadExpire(c, dirQuery, file_header.FileName)
 		if reach_end {
 			break
 		} else {
@@ -253,4 +303,47 @@ func FileUploadBig(c *gin.Context) {
 	}
 	//上传成功
 	engine.OK("上传成功", "", c)
+}
+
+// FileExpire 设置/清除文件过期时间；expire=0 表示不过期
+func FileExpire(c *gin.Context) {
+	f := c.Query("f")
+	if f == "" {
+		engine.ERR("路径不能为空", c)
+		return
+	}
+	rel := files.NormalizeRelPath(f)
+	if rel == "/" || strings.Contains(rel, "..") {
+		engine.ERR("非法路径", c)
+		return
+	}
+	abs := filepath.Join(config.Path, filepath.FromSlash(strings.TrimPrefix(rel, "/")))
+	if _, err := os.Stat(abs); err != nil {
+		engine.ERR("文件不存在", c)
+		return
+	}
+	expire, _ := strconv.ParseInt(c.DefaultQuery("expire", "0"), 10, 64)
+	if expire < 0 {
+		expire = 0
+	}
+	if expire > 0 && expire < time.Now().Unix() {
+		engine.ERR("过期时间不能早于现在", c)
+		return
+	}
+	if err := files.GetExpireStore(config.Path).Set(rel, expire); err != nil {
+		engine.ERR("保存过期设置失败: "+err.Error(), c)
+		return
+	}
+	engine.OK("OK", gin.H{"path": rel, "expire": expire}, c)
+}
+
+func applyUploadExpire(c *gin.Context, dirQuery, filename string) {
+	expire, _ := strconv.ParseInt(c.DefaultQuery("expire", "0"), 10, 64)
+	if expire <= 0 {
+		return
+	}
+	rel := files.NormalizeRelPath(path.Join(dirQuery, filename))
+	if err := files.GetExpireStore(config.Path).Set(rel, expire); err != nil {
+		log.Println("apply upload expire fail:", rel, err)
+	}
 }

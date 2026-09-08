@@ -9,7 +9,6 @@ import (
 
 	"b0go/core/engine"
 	_ "b0go/core/gateway"
-	"b0go/core/tools/cmd"
 	"b0go/core/tools/files"
 	"b0go/core/tools/nets"
 
@@ -25,7 +24,7 @@ func main() {
 	ok, _ := files.PathExists(configFile)
 	if !ok {
 		os.WriteFile(configFile, []byte(defaultConfig), 0666)
-		os.MkdirAll("files", 0666)
+		os.MkdirAll("files", 0755)
 	}
 	/**
 	* 启动服务
@@ -58,7 +57,6 @@ func main() {
 		engine.Print(aurora.BrightBlue("官网下载APP：  https://4bit.cn/p/b0pass"))
 		engine.Print(aurora.Green("需特别注意：本机【防火墙】设为：允许访问"))
 		engine.Print(aurora.Black("--------------------------------------------"))
-		cmd.Open("http://" + serverUrl)
 	}()
 	time.Sleep(5000 * time.Microsecond)
 	engine.Run(configFile)
