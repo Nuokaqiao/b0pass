@@ -15,12 +15,15 @@ require (
 )
 
 require (
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/gen2brain/shm v0.0.0-20230802011745-f2460f5984f7 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-playground/locales v0.13.0 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
+	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/golang/protobuf v1.3.3 // indirect
 	github.com/jezek/xgb v1.1.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
@@ -51,5 +54,5 @@ require (
 	golang.org/x/image v0.12.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
-	gopkg.in/yaml.v2 v2.2.8 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

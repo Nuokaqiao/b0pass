@@ -93,16 +93,19 @@ Confidence: Confirmed
 
 ---
 
-### 5. WebSocket Client / Hub（内存）
+### 5. WebSocket Client / Hub（内存 + 可选 Redis 历史）
 
 | 结构 | 字段 |
 |---|---|
-| Hub | clients map、broadcast/register/unregister channel |
+| Hub | clients map、broadcast/register/unregister、history store |
 | Client | hub、conn、send buffer(256) |
+| History | Redis ZSET 或内存；最多 10 条且 72 小时内 |
 
-消息体：原始文本字节；服务端不结构化存储。
+实时消息：原始文本字节广播。  
+历史：`GET /pass/text-history`；写入发生在每次广播时。
 
-Confidence: Confirmed
+Confidence: Confirmed  
+Source: `apps/pass/lib/chat/**`
 
 ---
 

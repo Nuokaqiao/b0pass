@@ -62,6 +62,7 @@ Related Paths:
 | GET | /file-expire | JWT* | FileExpire（`f` + `expire` unix；0=清除） |
 | GET | /file-content | JWT* | FileContent |
 | GET | /file-download | JWT* | FileDownload |
+| GET | /text-history | JWT* | TextHistory（最近≤10 条且≤72h） |
 | POST | /file-upload | JWT* | FileUpload（可选 query `expire=unix秒`） |
 | GET | /ws | JWT* | ServeWs |
 
@@ -77,9 +78,12 @@ Related Paths:
 type AppConfig struct {
   Live bool
   Path string // 文件根目录
+  RedisAddr, RedisPassword string
+  RedisDB int
 }
 ```
 
+传内容历史：Redis ZSET `stonepass:text:history`；`RedisAddr` 为空或连不上时回退进程内存。
 ---
 
 ## Dependencies

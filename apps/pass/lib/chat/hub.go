@@ -1,5 +1,9 @@
 package chat
 
+import (
+	"log"
+)
+
 // Hub maintains the set of active clients and broadcasts messages to the
 // clients.
 type Hub struct {
@@ -14,15 +18,25 @@ type Hub struct {
 
 	// Unregister requests from clients.
 	unregister chan *Client
+
+	history HistoryStore
 }
 
-func NewHub() *Hub {
+func NewHub(history HistoryStore) *Hub {
+	if history == nil {
+		history = NewMemoryHistory()
+	}
 	return &Hub{
 		broadcast:  make(chan []byte),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
+		history:    history,
 	}
+}
+
+func (h *Hub) History() HistoryStore {
+	return h.history
 }
 
 func (h *Hub) Run() {
@@ -36,6 +50,11 @@ func (h *Hub) Run() {
 				close(client.send)
 			}
 		case message := <-h.broadcast:
+			if len(message) > 0 && h.history != nil {
+				if _, err := h.history.Add(string(message)); err != nil {
+					log.Println("text history add fail:", err)
+				}
+			}
 			for client := range h.clients {
 				select {
 				case client.send <- message:

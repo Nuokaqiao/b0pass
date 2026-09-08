@@ -27,7 +27,7 @@ npm run build
 
 - `/` 首页：大按钮「传文件」「传内容」
 - `/files` 传文件
-- `/text` 传内容（WebSocket）
+- `/text` 传内容（WebSocket + 服务端历史，最近 10 条 / 72h）
 
 ## 注意
 

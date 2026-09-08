@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getToken } from '@/api/auth'
+import { fetchTextHistory } from '@/api/pass'
 
 const STORAGE_KEY = 'txtdata'
 const MAX_ITEMS = 100
@@ -19,14 +20,20 @@ let reconnectTimer = null
 let reconnectAttempt = 0
 let manualClose = false
 let copiedTimer = null
+const knownKeys = new Set()
 
 const canSync = computed(() => status.value === 'open')
-const newestFirst = computed(() => [...messages.value].reverse())
+
+function rememberKey(key) {
+  if (key) knownKeys.add(key)
+}
 
 function loadCache() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
     messages.value = Array.isArray(raw) ? raw.slice(-MAX_ITEMS) : []
+    knownKeys.clear()
+    for (const m of messages.value) rememberKey(m.key)
   } catch {
     messages.value = []
   }
@@ -34,6 +41,41 @@ function loadCache() {
 
 function saveCache() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.value.slice(-MAX_ITEMS)))
+}
+
+async function loadServerHistory() {
+  try {
+    const res = await fetchTextHistory()
+    const payload = res.data
+    const list = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.items)
+        ? payload.items
+        : []
+    const backend = Array.isArray(payload) ? '' : payload?.backend || ''
+    if (backend === 'memory') {
+      console.warn('传内容历史当前为内存模式，重启服务会丢失；请确认 Redis 已启动')
+    }
+    if (!list.length) {
+      if (backend === 'memory') messages.value = []
+      return
+    }
+    knownKeys.clear()
+    messages.value = list.map((it) => {
+      const item = {
+        key: it.key || `${it.ts || Date.now()}`,
+        val: it.val || '',
+        time: it.time || (it.ts ? new Date(it.ts * 1000).toLocaleString() : new Date().toLocaleString()),
+      }
+      rememberKey(item.key)
+      return item
+    })
+    saveCache()
+    await scrollBottom()
+  } catch {
+    // 回退本地缓存
+    loadCache()
+  }
 }
 
 function wsUrl() {
@@ -48,26 +90,34 @@ function setStatus(next, text) {
   statusText.value = text
 }
 
-async function scrollTop() {
+async function scrollBottom() {
   await nextTick()
-  if (logEl.value) logEl.value.scrollTop = 0
+  if (logEl.value) logEl.value.scrollTop = logEl.value.scrollHeight
 }
 
 function extractUrls(text) {
   return [...new Set((text.match(URL_RE) || []).map((u) => u.replace(/[),.;!?]+$/, '')))]
 }
 
-function pushMessage(text) {
+function pushMessage(text, meta = {}) {
+  const key = meta.key || `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  if (knownKeys.has(key)) return
+  const last = messages.value[messages.value.length - 1]
+  if (last && last.val === text) {
+    const lastTs = Date.parse(last.time) || 0
+    if (Math.abs(Date.now() - lastTs) < 3000) return
+  }
+  rememberKey(key)
   messages.value.push({
-    key: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    key,
     val: text,
-    time: new Date().toLocaleString(),
+    time: meta.time || new Date().toLocaleString(),
   })
   if (messages.value.length > MAX_ITEMS) {
     messages.value = messages.value.slice(-MAX_ITEMS)
   }
   saveCache()
-  scrollTop()
+  scrollBottom()
 }
 
 function clearReconnect() {
@@ -138,8 +188,9 @@ function sync() {
 
 function clearAll() {
   if (!messages.value.length) return
-  if (!confirm('清空本地内容记录？')) return
+  if (!confirm('清空本页显示的内容记录？（不影响其它设备上的服务端历史）')) return
   messages.value = []
+  knownKeys.clear()
   saveCache()
 }
 
@@ -169,8 +220,8 @@ function removeAt(key) {
   saveCache()
 }
 
-onMounted(() => {
-  loadCache()
+onMounted(async () => {
+  await loadServerHistory()
   connect()
 })
 
@@ -207,7 +258,7 @@ onBeforeUnmount(() => {
         <div ref="logEl" class="history-scroll">
           <div v-if="!messages.length" class="empty">还没有内容，粘贴一段试试</div>
 
-          <article v-for="msg in newestFirst" :key="msg.key" class="card">
+          <article v-for="msg in messages" :key="msg.key" class="card">
             <div class="card-meta">
               <small class="muted">{{ msg.time }}</small>
               <button class="link-btn danger" type="button" @click="removeAt(msg.key)">删除</button>

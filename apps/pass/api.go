@@ -1,6 +1,7 @@
 package app
 
 import (
+	"b0go/apps/pass/lib/chat"
 	"b0go/apps/pass/lib/files"
 	"b0go/apps/pass/lib/keys"
 	"b0go/apps/pass/lib/stream"
@@ -56,6 +57,24 @@ func Login(c *gin.Context) {
 		return
 	}
 	engine.OK("OK", gin.H{"token": token, "enabled": true, "expireHours": 24}, c)
+}
+
+// TextHistory 传内容最近历史（最多 10 条且 72 小时内）
+func TextHistory(c *gin.Context) {
+	if textHub == nil || textHub.History() == nil {
+		engine.OK("OK", gin.H{"items": []chat.HistoryItem{}, "backend": "none"}, c)
+		return
+	}
+	store := textHub.History()
+	list, err := store.List()
+	if err != nil {
+		engine.ERR(err.Error(), c)
+		return
+	}
+	if list == nil {
+		list = []chat.HistoryItem{}
+	}
+	engine.OK("OK", gin.H{"items": list, "backend": store.Backend()}, c)
 }
 
 // ReadConfig 读取配置

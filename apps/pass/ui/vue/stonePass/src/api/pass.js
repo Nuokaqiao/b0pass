@@ -80,6 +80,10 @@ export function setFileExpire(path, expireUnix = 0) {
   )
 }
 
+export function fetchTextHistory() {
+  return request(`/pass/text-history?_t=${Date.now()}`)
+}
+
 export function downloadUrl(path) {
   return withTokenQuery(`/pass/file-download?f=${encodeURIComponent(path)}`)
 }

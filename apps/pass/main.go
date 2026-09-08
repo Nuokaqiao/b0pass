@@ -22,8 +22,11 @@ import (
 
 // APP:AppConfig
 type AppConfig struct {
-	Live bool
-	Path string //文件根目录路径
+	Live          bool
+	Path          string //文件根目录路径
+	RedisAddr     string
+	RedisPassword string
+	RedisDB       int
 }
 
 // APP:VAR
@@ -35,6 +38,8 @@ var (
 	uiPath string
 	//go:embed ui/dist
 	uiFS embed.FS
+
+	textHub *chat.Hub
 )
 
 // APP:INIT
@@ -149,6 +154,7 @@ func routeApi() {
 	GETX("/file-content", "{f=相对路径,文件名称}", "文件内容", FileContent)
 	GETX("/file-download", "{f=相对路径}", "文件下载", FileDownload)
 	GETX("/file-expire", "{f=相对路径,expire=unix秒(0不过期)}", "设置文件过期时间", FileExpire)
+	GETX("/text-history", "{}", "传内容最近历史", TextHistory)
 
 	POSTX("/file-upload", "{post file,[expire=unix秒]}", "大文件上传", FileUpload)
 }
@@ -177,10 +183,15 @@ func POSTX(url, param, title string, handle gin.HandlerFunc) {
 
 // 注册ws路由
 func routeWs() {
-	hub := chat.NewHub()
-	go hub.Run()
+	store := chat.NewHistoryStore(chat.RedisOptions{
+		Addr:     config.RedisAddr,
+		Password: config.RedisPassword,
+		DB:       config.RedisDB,
+	})
+	textHub = chat.NewHub(store)
+	go textHub.Run()
 	engine.Gin.GET("/ws", func(c *gin.Context) {
-		chat.ServeWs(hub, c)
+		chat.ServeWs(textHub, c)
 	})
 }
 
