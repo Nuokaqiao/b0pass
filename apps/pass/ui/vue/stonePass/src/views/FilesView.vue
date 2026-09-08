@@ -19,7 +19,6 @@ const uploading = ref(false)
 const progress = ref(0)
 const uploadName = ref('')
 const fileInput = ref(null)
-const folderInput = ref(null)
 const expireAmountInput = ref(null)
 const toast = ref('')
 const toastError = ref(false)
@@ -310,16 +309,8 @@ async function createFolder() {
 }
 
 function triggerUpload() {
+  if (uploading.value || pendingUploadFiles.value.length) return
   const el = fileInput.value
-  if (!el) {
-    showToast('上传控件未就绪，请刷新页面', true)
-    return
-  }
-  el.click()
-}
-
-function triggerFolderUpload() {
-  const el = folderInput.value
   if (!el) {
     showToast('上传控件未就绪，请刷新页面', true)
     return
@@ -492,13 +483,6 @@ function onFilesSelected(e) {
   queueUploadItems(toUploadItems(files))
 }
 
-function onFolderSelected(e) {
-  const input = e.target
-  const files = Array.from(input.files || [])
-  input.value = ''
-  queueUploadItems(toUploadItems(files))
-}
-
 function onDragEnter(e) {
   e.preventDefault()
   dragDepth += 1
@@ -639,21 +623,8 @@ onMounted(() => loadList('/'))
             <button class="btn btn-ghost btn-sm" type="button" :disabled="loading" @click="loadList()">
               刷新
             </button>
-            <label class="btn btn-ghost btn-sm upload-label" :class="{ disabled: uploading || pendingUploadFiles.length }">
-              上传文件夹
-              <input
-                ref="folderInput"
-                type="file"
-                multiple
-                webkitdirectory
-                directory
-                class="file-input"
-                :disabled="uploading || pendingUploadFiles.length > 0"
-                @change="onFolderSelected"
-              />
-            </label>
             <label class="btn btn-primary btn-sm upload-label" :class="{ disabled: uploading || pendingUploadFiles.length }">
-              {{ uploading ? `上传中 ${progress}%` : '上传文件' }}
+              {{ uploading ? `上传中 ${progress}%` : '上传' }}
               <input
                 ref="fileInput"
                 type="file"
@@ -725,13 +696,10 @@ onMounted(() => loadList('/'))
         <div v-if="loading" class="empty">加载中…</div>
         <div v-else-if="!sortedItems.length" class="empty-box">
           <p>当前目录为空</p>
-          <p class="muted">点击「上传文件 / 上传文件夹」，或把文件、文件夹拖到此页面</p>
+          <p class="muted">点击「上传」选文件；文件夹请直接拖入（会自动识别）</p>
           <div class="empty-actions">
             <button class="btn btn-primary" type="button" :disabled="uploading" @click="triggerUpload">
-              选择文件
-            </button>
-            <button class="btn btn-ghost" type="button" :disabled="uploading" @click="triggerFolderUpload">
-              选择文件夹
+              上传
             </button>
           </div>
         </div>

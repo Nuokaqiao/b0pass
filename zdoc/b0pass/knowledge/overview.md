@@ -63,4 +63,4 @@ Browser → Gin(:ListenAddr)
 
 ## 文档漂移
 
-README 仍描述更广的历史能力（二维码、图文模式等）。**以当前 Vue + 源码为准**，见 [notes/knowledge-drift-readme-vs-ui.md](../notes/knowledge-drift-readme-vs-ui.md)。
+根目录 README 已按当前 Vue UI 改写（2026-09-08）。官网截图与未接 UI 的后端 API 仍可能不一致，见 [notes/knowledge-drift-readme-vs-ui.md](../notes/knowledge-drift-readme-vs-ui.md)。

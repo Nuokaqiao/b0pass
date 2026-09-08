@@ -1,157 +1,100 @@
-# 百灵快传（B0Pass）
+# 百灵快传（B0Pass）/ 石头记（StonePass）
 
-LAN large file transfer tool。
+局域网文件与内容互传工具：主电脑跑一个 Go 进程，其它设备用浏览器访问。
 
-基于Go语言的高性能 “手机电脑超大文件传输神器”、“局域网共享文件服务器”。
+当前 Web UI 品牌为 **石头记 / StonePass**（`apps/pass/ui/vue/stonePass`）。
 
-只需一个文件（exe）双击开启。
+## 1. 当前功能
 
-## 1. 主要功能
+### 1.1 已支持
 
-### 1.1 功能描述
+- [x] 局域网文件共享（浏览 / 上传 / 下载 / 新建文件夹 / 删除）
+- [x] 单可执行文件部署（Go `embed` 打包前端；亦可 `Live` 开发模式）
+- [x] 传文件：多选上传、拖拽上传、整夹上传（同一「上传」入口；相对路径落盘）
+- [x] 列表 **多选 / 全选**、批量删除
+- [x] 上传合计超过 **1 GiB** 时前端提示并二次确认
+- [x] 文件可选过期时间（默认不过期；到期自动清理）
+- [x] 大文件流式上传（服务端按 Content-Length 分流，避免整包进内存）
+- [x] 传内容：WebSocket 实时同步；简易 Markdown 展示；最近历史（≤10 条 / 72h，Redis 可选，否则内存）
+- [x] 可选共享口令登录（`[gateway] Password` 非空开启 JWT）
+- [x] 自定义监听地址 / 域名；自定义共享根目录
+- [x] Windows / Linux / macOS
 
-- [x] 局域网文件共享服务器
-- [x] 简单的单个可执行文件
-- [x] 共享文件界面（在同一局域网或WIFI下，传输超大文件）
-- [x] 二维码扫码界面（支持手机传输，支持其它电脑输入网址）
-- [x] 共享文件在线管理界面（主电脑打开、图片浏览器、重命名、删除等）
-- [x] 更简洁高效的操作界面
-- [x] 使用自研的 <a href="//github.com/bitepeng/b0boot-go" target="_blank">B0Boot-Go</a> 框架重构代码，更简洁、更模块化
-- [x] 文件上传界面支持多次选择（PC端支持拖拽上传）
-- [x] 大文件上传过程分片处理（上传更丝滑，不卡顿）
-- [x] 支持路径有空格或中文的情况
-- [x] 支持Windows、Linux、MacOS操作系统
-- [x] 支持端口（port）自定义配置
-- [x] 支持域名（domain）自定义配置
-- [x] 支持安卓手机APK应用（Uniapp开发的手机端）
-- [x] 支持连接主电脑的手机和电脑发送键盘和鼠标命令（支持windows）
-- [ ] 提升项目安全性（debug模式）
-- [ ] JWT安全控制（配置Pread:只读|Pupload:上传|Padmin:管理，Token验证）
-- [ ] 支持对文件多选和全选操作
-- [ ] 支持对PDF文件在线预览
-- [ ] 支持对上传的压缩包在线解压
-- [ ] 支持上传整个文件夹
-- [ ] 自动检查更新版本
+### 1.2 未做 / 未在当前 UI 暴露
 
-### 1.2 PC操作截图
+- [ ] 细粒度角色（只读 / 仅上传 / 管理）；现为共享口令全权限或完全开放
+- [ ] 上传断点续传、限速
+- [ ] PDF 在线预览、压缩包在线解压
+- [ ] 自动检查更新
+- [ ] 二维码主界面、独立安卓 APK、图文模式管理台等历史能力（部分后端 API 仍在，当前 Vue UI 未接）
 
-<table width="100%">
-<tr>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/pc/01.png" width="100%"/>
-    <p>主界面（功能说明）</p>
-</td>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/pc/02.png" width="100%"/>
-    <p>主界面（图文模式、文件菜单）</p>
-</td>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/pc/03.png" width="100%"/>
-    <p>主界面（列表模式）</p>
-</td>
-</tr>
-<tr>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/pc/04-1.png" width="100%"/>
-    <p>手机扫码（到主界面）</p>
-</td>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/pc/04-2.png" width="100%"/>
-    <p>手机扫码（到某个文件）</p>
-</td>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/pc/05.png" width="100%"/>
-    <p>大文件上传（选择文件）</p>
-</td>
-</tr>
-<tr>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/pc/06.png" width="100%"/>
-    <p>大文件上传（上传完成）</p>
-</td>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/pc/07-1.png" width="100%"/>
-    <p>图片浏览器</p>
-</td>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/pc/07-2.png" width="100%"/>
-    <p>Html文件 Web服务</p>
-</td>
-</tr>
-</table>
+> 说明：README 以**当前源码与 stonePass UI**为准；旧截图与发行站文案可能仍展示历史界面。
 
-### 1.3 手机操作截图
+## 2. 快速使用
 
-<table width="100%">
-<tr>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/phone/01.jpg" width="100%"/>
-    <p>主界面</p>
-</td>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/phone/02.jpg" width="100%"/>
-    <p>上传文件</p>
-</td>
-<td width="33%">
-    <img src="https://gitee.com/b0cloud/b0pass/raw/master/zdoc/_images/phone/03.jpg" width="100%"/>
-    <p>文件操作</p>
-</td>
-</tr>
-</table>
+1. 准备 `config.ini`（可参考下方示例）
+2. 运行可执行文件，或源码：`go run main/main.go`（在仓库根目录）
+3. 浏览器打开：`http://127.0.0.1:8888/app/pass/`（端口以配置为准）
+4. 同局域网其它设备用主机局域网 IP 访问同一地址
 
+### 配置示例
 
-## 2. 发行版下载使用
-
-### 下载前请阅读
--  已编译好***Windows、MacOS、Linux***等平台的可执行文件
--  只需下载到电脑，双击开启即可使用
--  注意1：建议不要安装到“C:\Program Files (x86)”等系统目录，否则需要右键“以管理员身份运行”
--  注意2：如果要自定义端口等配置，请修改`config.ini`文件
-```
+```ini
 [gateway]
-ListenAddr = ":8888"      # 配置IP和端口
-Domain = "test.com:8888"  # 可选配置，配置访问域名（若使用80端口或nginx代理，可忽略端口）
+ListenAddr = ":8888"       # 监听地址
+Domain = ""                # 可选访问域名
+Password = ""              # 非空则需登录；空则关闭鉴权
+
 [pass]
-Path = "files"            # 文件管理根目录
+Path = "files"             # 共享根目录
+Live = false               # true：开发时读 dist / 反代 Vite；false：用 embed 的前端
+RedisAddr = ""             # 传内容历史；空或连不上则用内存（重启丢失）
+RedisPassword = ""
+RedisDB = 0
 ```
 
-### 最新版下载地址
-- https://4bit.cn/p/b0pass    （百灵快传官网，直接下载）
-- https://www.oschina.net/p/b0pass （开源中国版本发布专题）
+注意：
 
-## 3. 代码仓库
-- https://github.com/bitepeng/b0pass   GitHub（主库）   欢迎star支持
-- https://gitee.com/b0cloud/b0pass     GitEE（国内同步） 欢迎star支持
+- 勿安装到需管理员权限的系统目录（如 `C:\Program Files`），否则可能无法写共享目录或配置。
+- 改 Go 代码或 `Live=false` 下的 embed 前端后，需**重启**进程；`Live=true` 且读磁盘 `ui/dist` 时，前端 `npm run build` 后强制刷新即可。
 
+### 发行版与仓库
 
-## 4. 使用场景
-- ***手机电脑共享文件***
+- 官网下载：https://4bit.cn/p/b0pass
+- 开源中国：https://www.oschina.net/p/b0pass
+- GitHub：https://github.com/bitepeng/b0pass
+- Gitee：https://gitee.com/b0cloud/b0pass
 
-    电脑上双击执行 -> 手机扫码 -> 手机、电脑文件可以互传。
+## 3. 使用场景
 
-- ***电脑之间共享文件***
+- **手机 ↔ 电脑**：电脑启动服务 → 手机浏览器打开主机地址 → 传文件 / 传内容  
+- **电脑 ↔ 电脑 / 虚拟机**：对端浏览器访问同一局域网地址即可  
+- **办公室 / 家庭临时共享**：走局域网 HTTP，跨 Windows / macOS / Linux / 手机浏览器
 
-    电脑A上双击执行 -> 电脑B上浏览器输入A的地址 -> 电脑A、电脑B文件可以互传。
+## 4. 源码开发
 
-- ***虚拟机和电脑之间共享文件***
-
-    电脑上双击执行 -> 虚拟机上浏览器输入电脑的地址 -> 虚拟机、电脑文件可以互传。
-
-- ***更多使用场景***
-
-    也可以用作“家庭影音中心”、“办公室文件共享”、“产品原型服务器”等。走局域网HTTP协议，Windows、MacOS、虚拟机、安卓、iPhone等都可以跨平台共享文件。
-
-## 5. 源码编译
-```
-# 下载代码
+```bash
 git clone https://github.com/bitepeng/b0pass.git
-
-# 使用go mod更新依赖
+cd b0pass
 go mod tidy
 
-# 开发运行
-cd main && go run ./main.go
+# 后端（仓库根目录）
+go run main/main.go
 
-# 编译运行开发版本
-cd main && ./build.bat
+# 前端开发（可选：config.ini 中 [pass] Live = true，并起 Vite）
+cd apps/pass/ui/vue/stonePass
+npm install
+npm run dev          # 开发
+npm run build        # 产物到 apps/pass/ui/dist/
 ```
+
+Windows 亦可参考 `main/build.bat` 做打包编译。
+
+## 5. 产品入口一览
+
+| 路径 | 说明 |
+|---|---|
+| `/app/pass/` | StonePass UI（传文件 / 传内容 / 登录） |
+| `/pass/*` | 文件与登录等 API |
+| `/files/*` | 共享目录静态访问 |
+| `/ws` | 传内容 WebSocket |
