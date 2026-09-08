@@ -1,0 +1,111 @@
+# b0pass / StonePass — 编译与部署
+#
+# 用法:
+#   make          # 检查依赖后编译前后端（默认）
+#   make check    # 仅检查依赖，缺什么列出来
+#   make deps     # 安装前后端依赖（go mod / npm install）
+#   make build    # 检查通过后：前端 build + Go 编译
+#   make deploy   # 编译并产出到 dist/（二进制 + 示例配置）
+#   make clean    # 清理产物
+#
+# 可选变量:
+#   OUT_DIR=dist BIN_NAME=b0pass
+#   GOOS=linux GOARCH=amd64   # 交叉编译时设置
+
+ROOT         := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+FRONTEND_DIR := $(ROOT)/apps/pass/ui/vue/stonePass
+MAIN_DIR     := $(ROOT)/main
+OUT_DIR      := $(ROOT)/dist
+BIN_NAME     ?= b0pass
+
+GOOS   ?= $(shell go env GOOS 2>/dev/null)
+GOARCH ?= $(shell go env GOARCH 2>/dev/null)
+
+ifeq ($(GOOS),windows)
+  BIN_FILE := $(OUT_DIR)/$(BIN_NAME).exe
+else
+  BIN_FILE := $(OUT_DIR)/$(BIN_NAME)
+endif
+
+.PHONY: all check deps frontend backend build deploy clean help
+
+all: build
+
+help:
+	@echo "目标:"
+	@echo "  make check    检查 go/node/npm 与前后端依赖是否齐全"
+	@echo "  make deps     安装缺失的前后端依赖"
+	@echo "  make build    检查通过后编译前端并打 Go 包"
+	@echo "  make deploy   编译并输出到 dist/"
+	@echo "  make clean    清理 dist/"
+	@echo ""
+	@echo "交叉编译示例: make deploy GOOS=linux GOARCH=amd64"
+
+# ---------- 依赖检查（汇总缺失项）----------
+check:
+	@bash "$(ROOT)/scripts/check-deps.sh" "$(ROOT)" "$(FRONTEND_DIR)"
+
+# ---------- 安装依赖 ----------
+deps:
+	@echo "==> 安装后端 Go 依赖"
+	@command -v go >/dev/null 2>&1 || { echo "[缺] Go 工具链，无法安装后端依赖"; exit 1; }
+	cd "$(ROOT)" && go mod download && go mod tidy
+	@echo "==> 安装前端 npm 依赖"
+	@command -v npm >/dev/null 2>&1 || { echo "[缺] npm，无法安装前端依赖"; exit 1; }
+	@test -f "$(FRONTEND_DIR)/package.json" || { echo "[缺] $(FRONTEND_DIR)/package.json"; exit 1; }
+	cd "$(FRONTEND_DIR)" && npm install
+	@echo "依赖安装完成"
+
+# ---------- 编译 ----------
+frontend:
+	@echo "==> 构建前端 → apps/pass/ui/dist"
+	cd "$(FRONTEND_DIR)" && npm run build
+	@test -f "$(ROOT)/apps/pass/ui/dist/index.html" || { echo "[失败] 前端产物缺少 index.html"; exit 1; }
+	@echo "前端构建完成"
+
+backend:
+	@echo "==> 编译 Go（GOOS=$(GOOS) GOARCH=$(GOARCH)）→ $(BIN_FILE)"
+	@mkdir -p "$(OUT_DIR)"
+	cd "$(MAIN_DIR)" && \
+		CGO_ENABLED=$${CGO_ENABLED:-0} GOOS="$(GOOS)" GOARCH="$(GOARCH)" \
+		go build -trimpath -ldflags="-s -w" -o "$(BIN_FILE)" .
+	@echo "后端编译完成: $(BIN_FILE)"
+
+build: check frontend backend
+	@echo "编译全部完成: $(BIN_FILE)"
+
+# ---------- 部署产出 ----------
+deploy: build
+	@echo "==> 准备部署目录 $(OUT_DIR)"
+	@if [ ! -f "$(OUT_DIR)/config.ini.example" ]; then \
+		printf '%s\n' \
+			'[gateway]' \
+			'ListenAddr = ":8888"' \
+			'Domain = ""' \
+			'Password = ""' \
+			'' \
+			'[pass]' \
+			'Path = "files"' \
+			'Live = false' \
+			'RedisAddr = ""' \
+			'RedisPassword = ""' \
+			'RedisDB = 0' \
+			> "$(OUT_DIR)/config.ini.example"; \
+		echo "  已写入 config.ini.example"; \
+	fi
+	@mkdir -p "$(OUT_DIR)/files"
+	@printf '%s\n' \
+		'# 部署说明' \
+		'1. 将本目录中的二进制与 config.ini.example 拷到目标机器' \
+		'2. 复制为 config.ini，按需修改 ListenAddr / Password / Path / Redis' \
+		'3. 生产请设 [pass] Live = false（前端已 embed 进二进制）' \
+		'4. 在含 config.ini 的目录运行: ./$(BIN_NAME)' \
+		'5. 浏览器打开: http://127.0.0.1:8888/app/pass/' \
+		> "$(OUT_DIR)/README.txt"
+	@echo "部署产物已就绪: $(OUT_DIR)/"
+	@ls -la "$(OUT_DIR)"
+
+clean:
+	@rm -rf "$(OUT_DIR)"
+	@echo "已清理 $(OUT_DIR)"
+	@echo "提示: 前端静态资源在 apps/pass/ui/dist，如需重建请 make frontend"

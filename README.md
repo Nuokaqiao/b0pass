@@ -88,6 +88,17 @@ npm run dev          # 开发
 npm run build        # 产物到 apps/pass/ui/dist/
 ```
 
+### 用 Make 编译 / 部署
+
+```bash
+make check     # 检查 go / node / npm 与前后端依赖，缺什么会列出来
+make deps      # 安装缺失依赖（go mod + npm install）
+make build     # 检查通过后：前端 build + Go 编译 → dist/b0pass
+make deploy    # 同上，并附带 config.ini.example、README.txt
+```
+
+交叉编译示例：`make deploy GOOS=linux GOARCH=amd64`
+
 Windows 亦可参考 `main/build.bat` 做打包编译。
 
 ## 5. 产品入口一览
