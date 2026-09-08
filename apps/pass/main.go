@@ -7,9 +7,12 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/logrusorgru/aurora"
@@ -59,18 +62,64 @@ func run() {
 // 注册静态路由
 func routeStatic(live bool) {
 	if live {
-		engine.Gin.Static("/index", uiPath)
+		viteProxy := createViteProxy()
+		if viteProxy != nil {
+			engine.Gin.Any("/app/pass", viteProxy)
+			engine.Gin.Any("/app/pass/*path", viteProxy)
+			engine.Gin.Any("/src/*path", viteProxy)
+			engine.Gin.Any("/node_modules/*path", viteProxy)
+			engine.Gin.Any("/@vite/*path", viteProxy)
+			engine.Gin.Any("/@fs/*path", viteProxy)
+			engine.Gin.Any("/@id/*path", viteProxy)
+			engine.Print(aurora.Yellow("Vue 开发模式：代理到 Vite (http://localhost:5173)"))
+			engine.Print(aurora.Yellow("请先运行: cd apps/pass/ui/vue/stonePass && npm run dev"))
+		} else {
+			engine.Gin.Static("/app/pass", uiPath)
+			engine.Print(aurora.Yellow("Vite 未启动，回退到 ui/dist 静态文件"))
+		}
 	} else {
 		uiDist, _ := fs.Sub(uiFS, "ui/dist")
-		engine.Gin.StaticFS("/index", http.FS(uiDist))
+		engine.Gin.StaticFS("/app/pass", http.FS(uiDist))
 	}
-	//默认首页
+
 	engine.Gin.GET("/", func(c *gin.Context) {
-		//c.Redirect(http.StatusMovedPermanently, "/index")
 		c.Writer.Write([]byte("<script>location.href='/app/pass/'</script>"))
 	})
-	//files静态
 	engine.Gin.StaticFS("/files", http.Dir(config.Path))
+}
+
+func createViteProxy() gin.HandlerFunc {
+	viteURL, err := url.Parse("http://127.0.0.1:5173")
+	if err != nil {
+		return nil
+	}
+	proxy := httputil.NewSingleHostReverseProxy(viteURL)
+	proxy.Director = func(req *http.Request) {
+		req.Header.Set("X-Forwarded-Host", req.Host)
+		req.URL.Scheme = viteURL.Scheme
+		req.URL.Host = viteURL.Host
+		path := req.URL.Path
+		if strings.HasPrefix(path, "/app/pass") {
+			req.URL.Path = path[len("/app/pass"):]
+			if req.URL.Path == "" {
+				req.URL.Path = "/"
+			}
+		}
+	}
+
+	client := &http.Client{Timeout: http.DefaultClient.Timeout}
+	resp, err := client.Get("http://127.0.0.1:5173")
+	if err != nil {
+		return nil
+	}
+	resp.Body.Close()
+	if resp.StatusCode >= 500 {
+		return nil
+	}
+
+	return func(c *gin.Context) {
+		proxy.ServeHTTP(c.Writer, c.Request)
+	}
 }
 
 // 注册应用路由

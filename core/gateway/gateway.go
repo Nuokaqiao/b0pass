@@ -97,9 +97,12 @@ func addAppStaticRoute(live bool) {
 			//docs
 			engine.Gin.Static("/dev/doc", docsPath)
 		}
-		//app/appid
-		for name, config := range engine.App {
-			engine.Gin.Static(fmt.Sprintf("/app/%s", name), config.UIDir)
+		//app/appid（pass 自行托管 Vue UI，这里跳过）
+		for name, cfg := range engine.App {
+			if name == "pass" {
+				continue
+			}
+			engine.Gin.Static(fmt.Sprintf("/app/%s", name), cfg.UIDir)
 		}
 	} else {
 		if config.Debug {
@@ -107,9 +110,12 @@ func addAppStaticRoute(live bool) {
 			docDist, _ := fs.Sub(docsPathFS, "doc/dist")
 			engine.Gin.StaticFS("/dev/doc", http.FS(docDist))
 		}
-		//app/appid
-		for name, config := range engine.App {
-			engine.Gin.StaticFS(fmt.Sprintf("/app/%s", name), http.FS(config.UIFS))
+		//app/appid（pass 自行托管 Vue UI，这里跳过）
+		for name, cfg := range engine.App {
+			if name == "pass" {
+				continue
+			}
+			engine.Gin.StaticFS(fmt.Sprintf("/app/%s", name), http.FS(cfg.UIFS))
 		}
 	}
 }
