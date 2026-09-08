@@ -1,0 +1,32 @@
+---
+description: 复杂任务前先读 Project Knowledge 并遵循 protocol
+alwaysApply: true
+---
+
+# Project Knowledge 工作流
+
+本仓库的长期项目记忆在 `zdoc/b0pass/`（工具无关，勿当作可忽略的临时笔记）。
+
+## 何时必须先读 Knowledge
+
+在回答或动手前，若任务涉及理解系统、改功能、查 bug、做设计、或同步文档，先：
+
+1. 读 `zdoc/b0pass/index.md`
+2. 按需读相关 `knowledge/`、`modules/`、`notes/`
+3. 重要或可能过期时，对照当前源码核实
+4. 严格遵循 `zdoc/b0pass/protocol.md`
+
+简单、与项目无关的问题不必通读全部 Knowledge。
+
+## 更新 Knowledge
+
+- 发现可长期复用的事实、规则、流程、风险时：增量更新对应文档，并视情况更新 `index.md` / `project.yaml` 的验证信息
+- 不要为了「完整」空写文档；不要重复造第二份真相源
+- 区分 **Confirmed / Inferred / Unknown**；推测不得写成事实
+- Knowledge 与代码冲突时：以当前源码为准，标记或记录 Drift，再更新 Knowledge
+
+## 不要做的事
+
+- 不要把整份 Knowledge 复制进回复或其它目录
+- 不要在未要求时提交 `zdoc/b0pass`（它通常独立于业务 Git 工作流维护）
+- 用户未要求同步时，不要借机全量重写 Knowledge
