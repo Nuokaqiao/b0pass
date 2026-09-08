@@ -62,6 +62,7 @@ func init() {
 ---------------------------------------------------
 */
 func run() {
+	engine.SetAuthPassword(config.Password)
 	//注册应用ui路由
 	engine.Print(aurora.Green("App gateway loaded"), aurora.BrightCyan(config))
 	addAppStaticRoute(config.Live)

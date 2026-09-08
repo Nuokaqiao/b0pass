@@ -24,6 +24,40 @@ func Ping(c *gin.Context) {
 	engine.OK("OK", true, c)
 }
 
+// AuthStatus 是否启用登录鉴权（公开）
+func AuthStatus(c *gin.Context) {
+	engine.OK("OK", gin.H{"enabled": engine.AuthEnabled()}, c)
+}
+
+// Login 共享口令登录，返回 JWT（公开）
+func Login(c *gin.Context) {
+	if !engine.AuthEnabled() {
+		engine.OK("鉴权未启用", gin.H{"token": "", "enabled": false}, c)
+		return
+	}
+	password := strings.TrimSpace(c.PostForm("password"))
+	if password == "" {
+		password = strings.TrimSpace(c.Query("password"))
+	}
+	if password == "" {
+		var body struct {
+			Password string `json:"password"`
+		}
+		_ = c.ShouldBindJSON(&body)
+		password = strings.TrimSpace(body.Password)
+	}
+	if !engine.CheckPassword(password) {
+		engine.JSON(401, "口令错误", nil, c)
+		return
+	}
+	token, err := engine.CreateToken("share")
+	if err != nil {
+		engine.ERR("签发失败", c)
+		return
+	}
+	engine.OK("OK", gin.H{"token": token, "enabled": true, "expireHours": 24}, c)
+}
+
 // ReadConfig 读取配置
 func ReadConfig(c *gin.Context) {
 	engine.OK("OK", config, c)

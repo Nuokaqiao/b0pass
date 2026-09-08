@@ -19,11 +19,23 @@ Related Paths:
 
 1. 用户运行可执行文件 / `go run main/main.go`
 2. 若无 `config.ini`，写入默认配置并创建 `files/`
-3. 引擎加载 gateway / pass / docs
+3. 引擎加载 gateway / pass / docs；gateway 将 `Password` 注入鉴权
 4. 监听 `ListenAddr`（默认 `:8888`）
-5. 控制台打印局域网访问地址；尝试用系统浏览器打开
+5. 控制台打印局域网访问地址
 
 **结果**：局域网内可通过 `http://{ip}:{port}/app/pass/` 访问。
+
+Confidence: Confirmed
+
+---
+
+## Flow 1b：登录（共享口令）
+
+1. `gateway.Password` 非空时，前端路由守卫将未登录访问重定向到 `#/login`
+2. 用户提交口令 → `POST /pass/login` → 返回 JWT（24h）
+3. 前端存 `localStorage` + Cookie `token`
+4. 后续 API / `/files` / `/ws` 带 token；401 回登录页
+5. `Password` 为空：鉴权关闭，无登录页
 
 Confidence: Confirmed
 
@@ -33,12 +45,11 @@ Confidence: Confirmed
 
 **参与者**：浏览器用户（局域网或公网部署均可）
 
-1. 打开首页 → 点「传文件」
+1. 打开首页 → 点「传文件」（需已登录，若开启鉴权）
 2. 前端 `GET /pass/file-list?f=/` 加载根目录
 3. 进入子目录：再次 file-list
-4. 点击文件：`window.open(/pass/file-download?f=...)`  
-   或图片预览使用 `/files{path}`
-5. 「复制链接」复制同源 download URL（Confirmed：当前 FilesView）
+4. 点「下载」：`/pass/file-download?f=...&token=...`；缩略图 `/files{path}?token=...`
+5. 「复制链接」复制同源 download URL（含 token 时链接可直下）
 
 **数据变化**：无服务端写操作；仅读盘。
 

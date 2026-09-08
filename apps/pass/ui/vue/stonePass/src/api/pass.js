@@ -1,6 +1,16 @@
+import { authHeaders, handleUnauthorized, withTokenQuery } from './auth'
+
 async function request(url, options = {}) {
-  const res = await fetch(url, options)
+  const headers = {
+    ...(options.headers || {}),
+    ...authHeaders(),
+  }
+  const res = await fetch(url, { ...options, headers })
   const data = await res.json().catch(() => null)
+  if (data && data.code === 401) {
+    handleUnauthorized()
+    throw new Error(data.msg || '请先登录')
+  }
   if (!res.ok) {
     throw new Error((data && data.msg) || `请求失败 (${res.status})`)
   }
@@ -35,6 +45,8 @@ export function uploadFile(dirPath, file, onProgress, expireUnix = 0) {
       url += `&expire=${expireUnix}`
     }
     xhr.open('POST', url)
+    const headers = authHeaders()
+    Object.keys(headers).forEach((k) => xhr.setRequestHeader(k, headers[k]))
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {
         onProgress(Math.round((e.loaded / e.total) * 100))
@@ -43,6 +55,11 @@ export function uploadFile(dirPath, file, onProgress, expireUnix = 0) {
     xhr.onload = () => {
       try {
         const data = JSON.parse(xhr.responseText || '{}')
+        if (data && data.code === 401) {
+          handleUnauthorized()
+          reject(new Error(data.msg || '请先登录'))
+          return
+        }
         if (xhr.status >= 200 && xhr.status < 300 && data && data.code === 0) {
           resolve(data)
         } else {
@@ -64,9 +81,9 @@ export function setFileExpire(path, expireUnix = 0) {
 }
 
 export function downloadUrl(path) {
-  return `/pass/file-download?f=${encodeURIComponent(path)}`
+  return withTokenQuery(`/pass/file-download?f=${encodeURIComponent(path)}`)
 }
 
 export function staticFileUrl(path) {
-  return `/files${path}`
+  return withTokenQuery(`/files${path}`)
 }

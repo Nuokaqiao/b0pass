@@ -55,6 +55,7 @@ func init() {
 func run() {
 	engine.Print(aurora.Green("App pass loaded"), aurora.BrightCyan(config))
 	engine.Gin.Use(engine.CorsMiddleware())
+	engine.Gin.Use(engine.PathAuthMiddleware("/files", "/ws"))
 	routeStatic(config.Live)
 	routeApi()
 	routeWs()
@@ -128,24 +129,28 @@ func createViteProxy() gin.HandlerFunc {
 
 // 注册应用路由
 func routeApi() {
+	// 公开：登录与鉴权状态
+	engine.GET(appId, "/auth-status", "{}", "鉴权是否启用", AuthStatus)
+	engine.POST(appId, "/login", "{password}", "共享口令登录", Login)
+
 	GETX("/ping", "{}", "连通性测试", Ping)
-	engine.GET(appId, "/read-config", "{}", "读取配置", ReadConfig)
-	engine.GET(appId, "/read-ip", "{}", "读取IP", ReadIP)
-	engine.GET(appId, "/cmd-open", "{}", "命令行打开", CmdOpen)
-	engine.GET(appId, "/cmd-key", "{}", "主电脑键盘", CmdKey)
+	GETX("/read-config", "{}", "读取配置", ReadConfig)
+	GETX("/read-ip", "{}", "读取IP", ReadIP)
+	GETX("/cmd-open", "{}", "命令行打开", CmdOpen)
+	GETX("/cmd-key", "{}", "主电脑键盘", CmdKey)
 
-	engine.GET(appId, "/node-tree", "{}", "目录树结构", NodeTree)
-	engine.GET(appId, "/node-add", "{f=相对路径(结尾带“/”为创建目录,否则为创建文件)}", "添加目录", NodeAdd)
-	engine.GET(appId, "/node-rename", "{f=原路径,n=新路径}", "重命名节点", NodeRename)
-	engine.GET(appId, "/node-delete", "{f=相对路径}", "删除节点", NodeRemove)
+	GETX("/node-tree", "{}", "目录树结构", NodeTree)
+	GETX("/node-add", "{f=相对路径(结尾带“/”为创建目录,否则为创建文件)}", "添加目录", NodeAdd)
+	GETX("/node-rename", "{f=原路径,n=新路径}", "重命名节点", NodeRename)
+	GETX("/node-delete", "{f=相对路径}", "删除节点", NodeRemove)
 
-	engine.GET(appId, "/file-count", "{f=相对路径}", "文件数量", FileCount)
-	engine.GET(appId, "/file-list", "{f=相对路径,[t=需要的类型]}", "文件列表", FileList)
-	engine.GET(appId, "/file-content", "{f=相对路径,文件名称}", "文件内容", FileContent)
-	engine.GET(appId, "/file-download", "{f=相对路径}", "文件列表", FileDownload)
-	engine.GET(appId, "/file-expire", "{f=相对路径,expire=unix秒(0不过期)}", "设置文件过期时间", FileExpire)
+	GETX("/file-count", "{f=相对路径}", "文件数量", FileCount)
+	GETX("/file-list", "{f=相对路径,[t=需要的类型]}", "文件列表", FileList)
+	GETX("/file-content", "{f=相对路径,文件名称}", "文件内容", FileContent)
+	GETX("/file-download", "{f=相对路径}", "文件下载", FileDownload)
+	GETX("/file-expire", "{f=相对路径,expire=unix秒(0不过期)}", "设置文件过期时间", FileExpire)
 
-	engine.POST(appId, "/file-upload", "{post file,[expire=unix秒]}", "大文件上传", FileUpload)
+	POSTX("/file-upload", "{post file,[expire=unix秒]}", "大文件上传", FileUpload)
 }
 
 /***** HttpRequest *****/

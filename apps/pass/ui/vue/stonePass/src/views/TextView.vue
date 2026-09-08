@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { getToken } from '@/api/auth'
 
 const STORAGE_KEY = 'txtdata'
 const MAX_ITEMS = 100
@@ -37,7 +38,9 @@ function saveCache() {
 
 function wsUrl() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${proto}//${location.host}/ws`
+  const token = getToken()
+  const q = token ? `?token=${encodeURIComponent(token)}` : ''
+  return `${proto}//${location.host}/ws${q}`
 }
 
 function setStatus(next, text) {

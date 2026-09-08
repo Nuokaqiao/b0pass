@@ -32,9 +32,12 @@ Related Paths:
 
 | Hash 路由 | 视图 | 功能 |
 |---|---|---|
-| `/` | HomeView | 两大入口：传文件 / 传内容 |
-| `/files` | FilesView | 目录浏览、拖拽/选择上传、下载、复制链接、新建文件夹、删除 |
+| `/login` | LoginView | 共享口令登录（`gateway.Password` 非空时） |
+| `/` | HomeView | 两大入口：传文件 / 传内容；可退出 |
+| `/files` | FilesView | 目录浏览、拖拽/选择上传、下载、复制链接、新建文件夹、删除、过期 |
 | `/text` | TextView | WebSocket 内容同步（剪贴板语义） |
+
+未登录（鉴权开启时）整站路由守卫拦截至 `/login`。请求头 / Cookie / Query 携带 `token`。
 
 Base：生产构建 `base: '/app/pass/'`，产物输出到 `apps/pass/ui/dist/`。
 

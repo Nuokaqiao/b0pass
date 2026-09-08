@@ -46,24 +46,28 @@ Related Paths:
 
 | Method | Path | Auth | Handler |
 |---|---|---|---|
-| GET | /ping | JWT | Ping |
-| GET | /read-config | 无 | ReadConfig |
-| GET | /read-ip | 无 | ReadIP |
-| GET | /cmd-open | 无 | CmdOpen |
-| GET | /cmd-key | 无 | CmdKey |
-| GET | /node-tree | 无 | NodeTree |
-| GET | /node-add | 无 | NodeAdd |
-| GET | /node-rename | 无 | NodeRename |
-| GET | /node-delete | 无 | NodeRemove |
-| GET | /file-count | 无 | FileCount |
-| GET | /file-list | 无 | FileList（含 expire / expireAt / expireLeft） |
-| GET | /file-expire | 无 | FileExpire（`f` + `expire` unix；0=清除） |
-| GET | /file-content | 无 | FileContent |
-| GET | /file-download | 无 | FileDownload |
-| POST | /file-upload | 无 | FileUpload（可选 query `expire=unix秒`） |
-| GET | /ws | 无（升级） | ServeWs |
+| GET | /auth-status | 无 | AuthStatus（`enabled`） |
+| POST | /login | 无 | Login（共享口令 → JWT） |
+| GET | /ping | JWT* | Ping |
+| GET | /read-config | JWT* | ReadConfig |
+| GET | /read-ip | JWT* | ReadIP |
+| GET | /cmd-open | JWT* | CmdOpen |
+| GET | /cmd-key | JWT* | CmdKey |
+| GET | /node-tree | JWT* | NodeTree |
+| GET | /node-add | JWT* | NodeAdd |
+| GET | /node-rename | JWT* | NodeRename |
+| GET | /node-delete | JWT* | NodeRemove |
+| GET | /file-count | JWT* | FileCount |
+| GET | /file-list | JWT* | FileList（含 expire / expireAt / expireLeft） |
+| GET | /file-expire | JWT* | FileExpire（`f` + `expire` unix；0=清除） |
+| GET | /file-content | JWT* | FileContent |
+| GET | /file-download | JWT* | FileDownload |
+| POST | /file-upload | JWT* | FileUpload（可选 query `expire=unix秒`） |
+| GET | /ws | JWT* | ServeWs |
 
-另：`GET /files/*` 静态；`GET /` 跳转 UI。
+\* `gateway.Password` 为空时 JWT 中间件自动放行。Token 可来自 Header / Query / Cookie `token`。
+
+另：`GET /files/*` 静态（同样鉴权）；`GET /` 跳转 UI。
 
 ---
 

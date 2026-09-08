@@ -1,11 +1,24 @@
 <script setup>
-import { RouterLink } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import { getCachedAuthEnabled, getToken, logout } from '@/api/auth'
+
+const router = useRouter()
+const showLogout = computed(() => getCachedAuthEnabled() !== false && !!getToken())
+
+function onLogout() {
+  logout()
+  router.replace({ name: 'login' })
+}
 </script>
 
 <template>
   <div class="page home">
     <header class="topbar shell home-top">
       <div class="brand">石头记 <span>StonePass</span></div>
+      <button v-if="showLogout" class="btn btn-ghost btn-sm logout-btn" type="button" @click="onLogout">
+        退出
+      </button>
     </header>
 
     <main class="shell home-main">
@@ -36,6 +49,10 @@ import { RouterLink } from 'vue-router'
   width: min(720px, calc(100% - 32px));
   margin: 0 auto;
   padding-top: 28px;
+}
+
+.logout-btn {
+  margin-left: auto;
 }
 
 .home-main {

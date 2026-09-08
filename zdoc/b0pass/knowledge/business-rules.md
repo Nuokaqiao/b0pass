@@ -19,11 +19,11 @@ Related Paths:
 
 | 规则 | 现状 | Confidence |
 |---|---|---|
-| 局域网开放访问 | 绝大多数 API **无鉴权** | Confirmed |
-| JWT | 仅 `GET /pass/ping` 使用 `JWTMiddleware`；无签发 Token 的业务入口被发现 | Confirmed |
-| Password 配置 | 存在于 gateway 配置，**未用于请求鉴权** | Confirmed |
+| 局域网开放访问 | `gateway.Password` 为空时绝大多数 API **无鉴权**；非空时需 JWT | Confirmed |
+| JWT | `POST /pass/login` 签发；Header/Query/Cookie `token`；pass API、`/files`、`/ws` 校验 | Confirmed |
+| Password 配置 | `[gateway] Password`；空=关闭鉴权 | Confirmed |
 | CORS | `Access-Control-Allow-Origin: *` | Confirmed |
-| README 规划的 Pread/Pupload/Padmin | 标记为未完成 | Confirmed（文档） |
+| README 规划的 Pread/Pupload/Padmin | 仍未按角色细分；当前为共享口令 | Confirmed（文档/现状） |
 
 **业务含义**：任何能访问端口的客户端可读写共享目录、可发送键鼠命令（若调用 API）、可加入 WS 广播。
 

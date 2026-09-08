@@ -20,7 +20,7 @@ func main() {
 	* 检查配置
 	 */
 	configFile := "config.ini"
-	defaultConfig := "[gateway]\nListenAddr = \":8888\"\nDomain=\"\"\n\n[pass]\nPath = \"files\"\n"
+	defaultConfig := "[gateway]\nListenAddr = \":8888\"\nDomain=\"\"\nPassword = \"a123\"\n\n[pass]\nPath = \"files\"\n"
 	ok, _ := files.PathExists(configFile)
 	if !ok {
 		os.WriteFile(configFile, []byte(defaultConfig), 0666)
