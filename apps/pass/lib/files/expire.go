@@ -114,6 +114,30 @@ func (s *ExpireStore) DeleteMeta(rel string) {
 	_ = s.Set(rel, 0)
 }
 
+// DeleteMetaUnder 删除某路径及其所有子路径的过期元数据（删目录时用）
+func (s *ExpireStore) DeleteMetaUnder(rel string) {
+	rel = NormalizeRelPath(rel)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data == nil {
+		return
+	}
+	prefix := rel
+	if !strings.HasSuffix(prefix, "/") {
+		prefix = prefix + "/"
+	}
+	changed := false
+	for k := range s.data {
+		if k == rel || strings.HasPrefix(k, prefix) {
+			delete(s.data, k)
+			changed = true
+		}
+	}
+	if changed {
+		_ = s.saveLocked()
+	}
+}
+
 // PurgeExpired 删除已过期文件并清理元数据
 func (s *ExpireStore) PurgeExpired() int {
 	now := time.Now().Unix()

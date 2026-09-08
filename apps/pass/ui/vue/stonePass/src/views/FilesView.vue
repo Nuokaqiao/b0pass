@@ -19,6 +19,7 @@ const uploading = ref(false)
 const progress = ref(0)
 const uploadName = ref('')
 const fileInput = ref(null)
+const folderInput = ref(null)
 const expireAmountInput = ref(null)
 const toast = ref('')
 const toastError = ref(false)
@@ -28,7 +29,12 @@ const newFolderName = ref('')
 const copiedPath = ref('')
 const uploadExpireAmount = ref('') // 空或 0 = 不过期
 const uploadExpireUnit = ref('h') // m | h | d
-const pendingUploadFiles = ref([]) // File[]，选文件后待确认过期再上传
+/** @type {import('vue').Ref<Array<{ file: File, relativePath: string }>>} */
+const pendingUploadFiles = ref([])
+/** @type {import('vue').Ref<Set<string>>} */
+const selectedPaths = ref(new Set())
+
+const SIZE_WARN_BYTES = 1024 * 1024 * 1024 // 1 GiB
 
 const expireEditor = ref(null) // { path, name, amount, unit } | null
 
@@ -38,12 +44,23 @@ const expireUnits = [
   { value: 'd', label: '天' },
 ]
 
+const pendingUploadBytes = computed(() =>
+  pendingUploadFiles.value.reduce((sum, it) => sum + (Number(it.file?.size) || 0), 0),
+)
+
+const pendingOverSizeWarn = computed(() => pendingUploadBytes.value > SIZE_WARN_BYTES)
+
 const pendingUploadSummary = computed(() => {
   const files = pendingUploadFiles.value
   if (!files.length) return ''
-  if (files.length === 1) return files[0].name
-  const names = files.slice(0, 3).map((f) => f.name).join('、')
-  return files.length > 3 ? `${names} 等 ${files.length} 个文件` : `${names}（共 ${files.length} 个）`
+  const sizeLabel = formatBytes(pendingUploadBytes.value)
+  if (files.length === 1) return `${files[0].relativePath || files[0].file.name}（${sizeLabel}）`
+  const names = files
+    .slice(0, 3)
+    .map((f) => f.relativePath || f.file.name)
+    .join('、')
+  const head = files.length > 3 ? `${names} 等 ${files.length} 个文件` : `${names}（共 ${files.length} 个）`
+  return `${head} · ${sizeLabel}`
 })
 
 watch(
@@ -109,6 +126,22 @@ const sortedItems = computed(() => {
   })
 })
 
+const selectedCount = computed(() => {
+  let n = 0
+  for (const it of sortedItems.value) {
+    if (selectedPaths.value.has(it.path)) n += 1
+  }
+  return n
+})
+
+const allSelected = computed(
+  () => sortedItems.value.length > 0 && selectedCount.value === sortedItems.value.length,
+)
+
+const selectAllIndeterminate = computed(
+  () => selectedCount.value > 0 && !allSelected.value,
+)
+
 const dirSummary = computed(() => {
   let folderCount = 0
   let fileCount = 0
@@ -171,6 +204,7 @@ function showToast(msg, isError = false) {
 async function loadList(path = currentPath.value) {
   loading.value = true
   error.value = ''
+  selectedPaths.value = new Set()
   try {
     const res = await fetchFileList(path || '/')
     items.value = Array.isArray(res.data) ? res.data : []
@@ -183,6 +217,29 @@ async function loadList(path = currentPath.value) {
   }
 }
 
+function isSelected(path) {
+  return selectedPaths.value.has(path)
+}
+
+function setSelected(path, checked) {
+  const next = new Set(selectedPaths.value)
+  if (checked) next.add(path)
+  else next.delete(path)
+  selectedPaths.value = next
+}
+
+function toggleSelectAll() {
+  if (allSelected.value) {
+    selectedPaths.value = new Set()
+    return
+  }
+  selectedPaths.value = new Set(sortedItems.value.map((it) => it.path))
+}
+
+function clearSelection() {
+  selectedPaths.value = new Set()
+}
+
 function openItem(item) {
   if (item.type !== 'dir') return
   loadList(item.path.endsWith('/') ? item.path : `${item.path}/`)
@@ -193,14 +250,35 @@ async function removeItem(item) {
   const targetPath = item.path
   try {
     await deleteNode(targetPath)
-    // 先从本地列表移除，避免刷新延迟或缓存造成「没删掉」的错觉
     items.value = items.value.filter((it) => it.path !== targetPath)
+    const next = new Set(selectedPaths.value)
+    next.delete(targetPath)
+    selectedPaths.value = next
     showToast('已删除')
     await loadList()
   } catch (e) {
     showToast(e.message || '删除失败', true)
     await loadList()
   }
+}
+
+async function removeSelected() {
+  const targets = sortedItems.value.filter((it) => selectedPaths.value.has(it.path))
+  if (!targets.length) return
+  if (!confirm(`确定删除已选的 ${targets.length} 项？`)) return
+  let ok = 0
+  let fail = 0
+  for (const item of targets) {
+    try {
+      await deleteNode(item.path)
+      ok += 1
+    } catch {
+      fail += 1
+    }
+  }
+  if (fail) showToast(`已删除 ${ok} 项，失败 ${fail} 项`, true)
+  else showToast(`已删除 ${ok} 项`)
+  await loadList()
 }
 
 function openNewFolder() {
@@ -232,7 +310,6 @@ async function createFolder() {
 }
 
 function triggerUpload() {
-  // 兜底：部分环境 label/click 异常时仍可打开
   const el = fileInput.value
   if (!el) {
     showToast('上传控件未就绪，请刷新页面', true)
@@ -241,9 +318,97 @@ function triggerUpload() {
   el.click()
 }
 
-function queueUploadFiles(fileList) {
-  const files = Array.isArray(fileList) ? fileList : Array.from(fileList || [])
-  if (!files.length) {
+function triggerFolderUpload() {
+  const el = folderInput.value
+  if (!el) {
+    showToast('上传控件未就绪，请刷新页面', true)
+    return
+  }
+  el.click()
+}
+
+/** 规范化相对路径，拒绝 .. */
+function normalizeRelPath(raw) {
+  const p = String(raw || '')
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+  if (!p) return ''
+  const parts = p.split('/').filter(Boolean)
+  if (parts.some((x) => x === '..')) {
+    throw new Error(`非法路径：${raw}`)
+  }
+  return parts.join('/')
+}
+
+function toUploadItems(fileList) {
+  return Array.from(fileList || []).map((file) => {
+    const relativePath = normalizeRelPath(file.webkitRelativePath || file.name)
+    return { file, relativePath: relativePath || file.name }
+  })
+}
+
+function readEntries(reader) {
+  return new Promise((resolve, reject) => {
+    reader.readEntries(resolve, reject)
+  })
+}
+
+function entryFile(entry) {
+  return new Promise((resolve, reject) => {
+    entry.file(resolve, reject)
+  })
+}
+
+async function walkDirEntry(entry, prefix, out) {
+  if (entry.isFile) {
+    const file = await entryFile(entry)
+    const relativePath = normalizeRelPath(prefix ? `${prefix}/${file.name}` : file.name)
+    if (relativePath) out.push({ file, relativePath })
+    return
+  }
+  if (!entry.isDirectory) return
+  const nextPrefix = prefix ? `${prefix}/${entry.name}` : entry.name
+  const reader = entry.createReader()
+  let batch = await readEntries(reader)
+  while (batch.length) {
+    for (const child of batch) {
+      await walkDirEntry(child, nextPrefix, out)
+    }
+    batch = await readEntries(reader)
+  }
+}
+
+async function collectDroppedItems(dataTransfer) {
+  const items = dataTransfer?.items
+  if (items && items.length) {
+    const entries = []
+    for (let i = 0; i < items.length; i += 1) {
+      const entry = items[i].webkitGetAsEntry?.()
+      if (entry) entries.push(entry)
+    }
+    if (entries.length) {
+      const out = []
+      for (const entry of entries) {
+        await walkDirEntry(entry, '', out)
+      }
+      return out
+    }
+  }
+  return toUploadItems(dataTransfer?.files)
+}
+
+function queueUploadItems(items) {
+  let list = []
+  try {
+    list = (items || []).map((it) => ({
+      file: it.file,
+      relativePath: normalizeRelPath(it.relativePath || it.file?.name || ''),
+    })).filter((it) => it.file && it.relativePath)
+  } catch (e) {
+    showToast(e.message || '路径无效', true)
+    return
+  }
+  if (!list.length) {
     showToast('未选择到文件', true)
     return
   }
@@ -251,7 +416,7 @@ function queueUploadFiles(fileList) {
     showToast('正在上传中，请稍候', true)
     return
   }
-  pendingUploadFiles.value = files
+  pendingUploadFiles.value = list
   uploadExpireAmount.value = ''
   uploadExpireUnit.value = 'h'
 }
@@ -265,14 +430,20 @@ function cancelPendingUpload() {
 async function confirmPendingUpload() {
   const files = pendingUploadFiles.value
   if (!files.length) return
+  if (pendingOverSizeWarn.value) {
+    const ok = confirm(
+      `所选内容约 ${formatBytes(pendingUploadBytes.value)}，已超过 1 GB，上传可能较久。确定继续？`,
+    )
+    if (!ok) return
+  }
   const expireUnix = expireUnixFromAmount(uploadExpireAmount.value, uploadExpireUnit.value)
   pendingUploadFiles.value = []
   await uploadFiles(files, expireUnix)
 }
 
-async function uploadFiles(fileList, expireUnix = 0) {
-  const files = Array.isArray(fileList) ? fileList : Array.from(fileList || [])
-  if (!files.length) {
+async function uploadFiles(itemList, expireUnix = 0) {
+  const items = Array.isArray(itemList) ? itemList : []
+  if (!items.length) {
     showToast('未选择到文件', true)
     return
   }
@@ -282,17 +453,28 @@ async function uploadFiles(fileList, expireUnix = 0) {
   }
   uploading.value = true
   progress.value = 0
-  const dir = normalizeDir(currentPath.value)
+  const baseDir = normalizeDir(currentPath.value)
   try {
-    for (let i = 0; i < files.length; i += 1) {
-      const file = files[i]
-      uploadName.value = files.length > 1 ? `${file.name}（${i + 1}/${files.length}）` : file.name
+    for (let i = 0; i < items.length; i += 1) {
+      const { file, relativePath } = items[i]
+      const parts = relativePath.split('/')
+      const fileName = parts.pop()
+      const sub = parts.length ? `${parts.join('/')}/` : ''
+      const targetDir = `${baseDir}${sub}`
+      uploadName.value =
+        items.length > 1 ? `${relativePath}（${i + 1}/${items.length}）` : relativePath
       progress.value = 0
-      await uploadFile(dir, file, (p) => {
-        progress.value = p
-      }, expireUnix)
+      await uploadFile(
+        targetDir,
+        file,
+        (p) => {
+          progress.value = p
+        },
+        expireUnix,
+        fileName,
+      )
     }
-    showToast(files.length > 1 ? `已上传 ${files.length} 个文件` : '上传完成')
+    showToast(items.length > 1 ? `已上传 ${items.length} 个文件` : '上传完成')
     await loadList()
   } catch (err) {
     showToast(err.message || '上传失败', true)
@@ -306,9 +488,15 @@ async function uploadFiles(fileList, expireUnix = 0) {
 function onFilesSelected(e) {
   const input = e.target
   const files = Array.from(input.files || [])
-  // 必须先拷贝再清空：FileList 为 live 引用
   input.value = ''
-  queueUploadFiles(files)
+  queueUploadItems(toUploadItems(files))
+}
+
+function onFolderSelected(e) {
+  const input = e.target
+  const files = Array.from(input.files || [])
+  input.value = ''
+  queueUploadItems(toUploadItems(files))
 }
 
 function onDragEnter(e) {
@@ -327,12 +515,16 @@ function onDragLeave(e) {
   if (dragDepth === 0) dragging.value = false
 }
 
-function onDrop(e) {
+async function onDrop(e) {
   e.preventDefault()
   dragDepth = 0
   dragging.value = false
-  const files = e.dataTransfer?.files
-  if (files?.length) queueUploadFiles(Array.from(files))
+  try {
+    const items = await collectDroppedItems(e.dataTransfer)
+    queueUploadItems(items)
+  } catch (err) {
+    showToast(err.message || '读取拖拽内容失败', true)
+  }
 }
 
 function previewUrl(item) {
@@ -419,7 +611,7 @@ onMounted(() => loadList('/'))
     @drop="onDrop"
   >
     <div v-if="dragging" class="drop-mask" aria-hidden="true">
-      <div class="drop-card">松开以上传到当前目录</div>
+      <div class="drop-card">松开以上传文件或文件夹到当前目录</div>
     </div>
 
     <header class="topbar shell">
@@ -447,8 +639,21 @@ onMounted(() => loadList('/'))
             <button class="btn btn-ghost btn-sm" type="button" :disabled="loading" @click="loadList()">
               刷新
             </button>
+            <label class="btn btn-ghost btn-sm upload-label" :class="{ disabled: uploading || pendingUploadFiles.length }">
+              上传文件夹
+              <input
+                ref="folderInput"
+                type="file"
+                multiple
+                webkitdirectory
+                directory
+                class="file-input"
+                :disabled="uploading || pendingUploadFiles.length > 0"
+                @change="onFolderSelected"
+              />
+            </label>
             <label class="btn btn-primary btn-sm upload-label" :class="{ disabled: uploading || pendingUploadFiles.length }">
-              {{ uploading ? `上传中 ${progress}%` : '上传' }}
+              {{ uploading ? `上传中 ${progress}%` : '上传文件' }}
               <input
                 ref="fileInput"
                 type="file"
@@ -486,13 +691,49 @@ onMounted(() => loadList('/'))
         <p v-if="error" class="error">{{ error }}</p>
         <p v-if="!loading" class="dir-summary muted">{{ summaryText() }}</p>
 
+        <div v-if="!loading && sortedItems.length" class="select-bar">
+          <label class="select-all">
+            <input
+              type="checkbox"
+              :checked="allSelected"
+              :indeterminate="selectAllIndeterminate"
+              @change="toggleSelectAll"
+            />
+            <span>全选</span>
+          </label>
+          <span v-if="selectedCount" class="muted">已选 {{ selectedCount }} 项</span>
+          <div class="select-actions">
+            <button
+              v-if="selectedCount"
+              class="btn btn-ghost btn-sm"
+              type="button"
+              @click="clearSelection"
+            >
+              取消选择
+            </button>
+            <button
+              v-if="selectedCount"
+              class="btn btn-danger btn-sm"
+              type="button"
+              @click="removeSelected"
+            >
+              删除所选
+            </button>
+          </div>
+        </div>
+
         <div v-if="loading" class="empty">加载中…</div>
         <div v-else-if="!sortedItems.length" class="empty-box">
           <p>当前目录为空</p>
-          <p class="muted">点击「上传」，或把文件拖到此页面</p>
-          <button class="btn btn-primary" type="button" :disabled="uploading" @click="triggerUpload">
-            选择文件
-          </button>
+          <p class="muted">点击「上传文件 / 上传文件夹」，或把文件、文件夹拖到此页面</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" type="button" :disabled="uploading" @click="triggerUpload">
+              选择文件
+            </button>
+            <button class="btn btn-ghost" type="button" :disabled="uploading" @click="triggerFolderUpload">
+              选择文件夹
+            </button>
+          </div>
         </div>
 
         <ul v-else class="file-list">
@@ -500,9 +741,19 @@ onMounted(() => loadList('/'))
             v-for="item in sortedItems"
             :key="item.path"
             class="file-card"
-            :class="{ 'is-editing-expire': expireEditor?.path === item.path }"
+            :class="{
+              'is-editing-expire': expireEditor?.path === item.path,
+              'is-selected': isSelected(item.path),
+            }"
           >
             <div class="file-row">
+              <label class="row-check" @click.stop>
+                <input
+                  type="checkbox"
+                  :checked="isSelected(item.path)"
+                  @change="setSelected(item.path, $event.target.checked)"
+                />
+              </label>
               <button
                 v-if="item.type === 'dir'"
                 class="file-main"
@@ -597,6 +848,9 @@ onMounted(() => loadList('/'))
         <div class="modal-card upload-confirm-modal" tabindex="-1" @keydown.esc.prevent="cancelPendingUpload">
           <h3 class="modal-title">确认上传</h3>
           <p class="modal-desc muted">{{ pendingUploadSummary }}</p>
+          <p v-if="pendingOverSizeWarn" class="size-warn">
+            总大小超过 1 GB，上传可能较久，请确认网络与电量。
+          </p>
           <div class="expire-select modal-expire">
             <span>过期</span>
             <input
@@ -909,12 +1163,81 @@ onMounted(() => loadList('/'))
   margin: 0;
 }
 
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.size-warn {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(180, 110, 20, 0.12);
+  border: 1px solid rgba(180, 110, 20, 0.28);
+  color: #8a4b00;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .file-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 10px;
+}
+
+.select-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(232, 244, 248, 0.65);
+  border: 1px solid rgba(15, 110, 140, 0.12);
+}
+
+.select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+.select-all input,
+.row-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.select-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.row-check {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 4px 2px;
+  cursor: pointer;
+}
+
+.file-card.is-selected {
+  border-color: rgba(15, 110, 140, 0.4);
+  background: rgba(232, 244, 248, 0.9);
 }
 
 .file-card {

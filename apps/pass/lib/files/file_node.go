@@ -51,8 +51,15 @@ func NodeRename(fPath, nPath string) error {
 	return os.Rename(fPath, nPath)
 }
 
-// 删除节点
+// 删除节点（目录用 RemoveAll，避免隐藏文件如 .DS_Store 导致“删不掉”）
 func NodeRemove(fPath string) error {
+	info, err := os.Lstat(fPath)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return os.RemoveAll(fPath)
+	}
 	return os.Remove(fPath)
 }
 

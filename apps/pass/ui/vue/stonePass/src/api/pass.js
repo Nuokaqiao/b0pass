@@ -34,11 +34,12 @@ export function addNode(path) {
   return request(`/pass/node-add?f=${encodeURIComponent(path)}`)
 }
 
-export function uploadFile(dirPath, file, onProgress, expireUnix = 0) {
+export function uploadFile(dirPath, file, onProgress, expireUnix = 0, saveAsName = '') {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     const form = new FormData()
-    form.append('file', file)
+    const name = saveAsName || file.name
+    form.append('file', file, name)
     const target = dirPath || '/'
     let url = `/pass/file-upload?f=${encodeURIComponent(target)}`
     if (expireUnix > 0) {

@@ -163,7 +163,9 @@ func NodeRemove(c *gin.Context) {
 		engine.ERR(err.Error(), c)
 		return
 	}
-	files.GetExpireStore(config.Path).DeleteMeta("/" + f)
+	rel := "/" + strings.TrimSuffix(f, "/")
+	store := files.GetExpireStore(config.Path)
+	store.DeleteMetaUnder(rel)
 	audit.Log(c, "node-delete", "path=/"+f)
 	engine.OK("OK", nil, c)
 }

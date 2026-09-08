@@ -20,7 +20,7 @@ Password 为空：无登录页，中间件放行。
 ## 3. 传文件
 
 浏览：`file-list`；进目录；下载 `file-download`（及缩略图 `/files`，需 token）。  
-上传：选文件 → 弹窗设过期（可空）→ `file-upload` → 刷新。  
+上传：选文件/文件夹或拖入（含目录）→ 合计大小 >1 GiB 提示 → 弹窗设过期（可空）→ 按相对路径逐文件 `file-upload?f=目标子目录/` → 刷新。  
 新建/删除：`node-add` / `node-delete`；过期：`file-expire` 或上传时带 expire。  
 自动清理：启动 + 每分钟 + 列表前 purge（≤72h 规则在过期元数据侧）。
 
