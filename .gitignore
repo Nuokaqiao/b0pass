@@ -8,3 +8,6 @@ zdoc/*.zip
 zdoc/*/b0pass
 zdoc/*/b0pass.exe
 /dist/
+# 前端静态产物：本地 npm run build / make frontend 生成，不入库
+apps/pass/ui/dist/*
+!apps/pass/ui/dist/.gitkeep

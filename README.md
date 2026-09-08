@@ -85,7 +85,7 @@ go run main/main.go
 cd apps/pass/ui/vue/stonePass
 npm install
 npm run dev          # 开发
-npm run build        # 产物到 apps/pass/ui/dist/
+npm run build        # 产物到 apps/pass/ui/dist/（该目录不入库，需本地/CI 构建）
 ```
 
 ### 用 Make 编译 / 部署
@@ -98,6 +98,8 @@ make deploy    # 同上，并附带 config.ini.example、README.txt
 ```
 
 交叉编译示例：`make deploy GOOS=linux GOARCH=amd64`
+
+说明：`apps/pass/ui/dist/` 与根目录 `dist/` 均不提交；克隆后请先 `make deps && make build`（或手动 `npm install` + `npm run build`）再编译/运行。
 
 Windows 亦可参考 `main/build.bat` 做打包编译。
 
