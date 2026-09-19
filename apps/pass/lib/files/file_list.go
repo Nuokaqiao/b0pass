@@ -188,6 +188,7 @@ func GetDirTree(root, fp, fpSub, ftype string) []map[string]interface{} {
 		m["size"] = strconv.Itoa(int(fileInfo.Size()))
 		m["sizes"] = GetSize(uint64(fileInfo.Size()))
 		m["date"] = fileInfo.ModTime().Format("01-02 15:04")
+		m["mtime"] = fileInfo.ModTime().Unix()
 		m["path"] = fpath
 		m["type"] = mtype
 		m["canread"] = canread

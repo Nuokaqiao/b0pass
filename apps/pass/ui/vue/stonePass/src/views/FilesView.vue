@@ -119,8 +119,14 @@ const crumbs = computed(() => {
 
 const sortedItems = computed(() => {
   return [...items.value].sort((a, b) => {
-    if (a.type === 'dir' && b.type !== 'dir') return -1
-    if (a.type !== 'dir' && b.type === 'dir') return 1
+    const aDir = a.type === 'dir'
+    const bDir = b.type === 'dir'
+    if (aDir && !bDir) return -1
+    if (!aDir && bDir) return 1
+    // 同类型（目录 / 非目录）内按修改时间倒序；mtime 缺失时回退到名称
+    const aTime = Number(a.mtime) || 0
+    const bTime = Number(b.mtime) || 0
+    if (aTime !== bTime) return bTime - aTime
     return String(a.name).localeCompare(String(b.name), 'zh')
   })
 })
@@ -1354,3 +1360,4 @@ onMounted(() => loadList('/'))
   }
 }
 </style>
+
